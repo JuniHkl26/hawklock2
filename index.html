@@ -291,6 +291,36 @@
   .badge-yellow { background:rgba(245,158,11,0.15); border:1px solid #f59e0b; color:#f59e0b; }
   .badge-red { background:rgba(239,68,68,0.15); border:1px solid #ef4444; color:#ef4444; }
 
+
+  /* ── PIN SCREEN ── */
+  #pinScreen {
+    position: fixed; inset: 0; background: var(--hawk-black);
+    z-index: 9999; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 40px 24px;
+  }
+  #pinScreen.hidden { display: none; }
+  .pin-logo { font-family: 'Rajdhani', sans-serif; font-size: 28px; font-weight: 700;
+    letter-spacing: 6px; color: var(--hawk-white); margin-bottom: 6px; }
+  .pin-sub { font-size: 11px; color: var(--hawk-silver-dim); letter-spacing: 3px;
+    text-transform: uppercase; margin-bottom: 48px; }
+  .pin-dots { display: flex; gap: 16px; margin-bottom: 40px; }
+  .pin-dot { width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid var(--hawk-border); background: transparent; transition: all 0.2s; }
+  .pin-dot.filled { background: var(--hawk-blue); border-color: var(--hawk-blue);
+    box-shadow: 0 0 12px rgba(29,114,232,0.6); }
+  .pin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 280px; }
+  .pin-key { background: var(--hawk-panel); border: 1px solid var(--hawk-border);
+    border-radius: 12px; padding: 18px; font-size: 22px; font-weight: 700;
+    color: var(--hawk-white); cursor: pointer; transition: all 0.15s;
+    font-family: 'Barlow Condensed', sans-serif; letter-spacing: 1px; text-align: center; }
+  .pin-key:active { background: rgba(29,114,232,0.2); border-color: var(--hawk-blue);
+    transform: scale(0.95); }
+  .pin-key.del { color: var(--hawk-red); }
+  .pin-error { color: var(--hawk-red); font-size: 12px; letter-spacing: 1px;
+    margin-top: 20px; min-height: 20px; text-align: center; }
+  .pin-change { color: var(--hawk-silver-dim); font-size: 11px; letter-spacing: 1px;
+    margin-top: 24px; cursor: pointer; text-decoration: underline; }
+
   @media print {
     body { background:#fff; color:#111; }
     body::before { display:none; }
@@ -304,6 +334,34 @@
 <body>
 
 <!-- ══════════════ FACTURACIÓN PAGE ══════════════ -->
+
+<!-- PIN SCREEN -->
+<div id="pinScreen">
+  <div class="pin-logo">🦅 HAWK LOCK</div>
+  <div class="pin-sub">Sistema de Facturación</div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+  </div>
+  <div class="pin-grid">
+    <button class="pin-key" onclick="pinPress('1')">1</button>
+    <button class="pin-key" onclick="pinPress('2')">2</button>
+    <button class="pin-key" onclick="pinPress('3')">3</button>
+    <button class="pin-key" onclick="pinPress('4')">4</button>
+    <button class="pin-key" onclick="pinPress('5')">5</button>
+    <button class="pin-key" onclick="pinPress('6')">6</button>
+    <button class="pin-key" onclick="pinPress('7')">7</button>
+    <button class="pin-key" onclick="pinPress('8')">8</button>
+    <button class="pin-key" onclick="pinPress('9')">9</button>
+    <button class="pin-key" onclick="pinPress('0')" style="grid-column:2">0</button>
+    <button class="pin-key del" onclick="pinDel()">⌫</button>
+  </div>
+  <div class="pin-error" id="pinError"></div>
+  <div class="pin-change" onclick="pinChangePrompt()">Cambiar PIN</div>
+</div>
+
 <div class="page active" id="page-factura">
 
   <div class="topbar">
@@ -577,8 +635,12 @@
         <input type="number" id="gastoIva" value="0" min="0" step="1000" inputmode="numeric" oninput="calcGasto()">
       </div>
       <div class="form-group">
+        <label>Valor abonado ($)</label>
+        <input type="number" id="gastoAbono" value="0" min="0" step="1000" inputmode="numeric" oninput="calcGasto()">
+      </div>
+      <div class="form-group">
         <label>Pendiente ($)</label>
-        <input type="number" id="gastoPendiente" value="0" min="0" step="1000" inputmode="numeric">
+        <input type="number" id="gastoPendiente" value="0" min="0" step="1000" inputmode="numeric" readonly style="opacity:0.7">
       </div>
     </div>
     <div class="totals-box" style="margin-top:12px">
@@ -624,8 +686,9 @@
     <div id="invoiceHTML"></div>
     <div class="modal-actions">
       <button class="btn-close-modal" onclick="closeModal()">✕ Cerrar</button>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-print" onclick="window.print()" style="background:rgba(29,114,232,0.15);border:1px solid #1d72e8;color:#3d9bff">🖨 Imprimir</button>
+        <button class="btn-print" onclick="enviarWhatsApp()" style="background:#128C7E;border:none;color:#fff">📲 WhatsApp</button>
         <button class="btn-print" onclick="guardarDesdeModal()">💾 Guardar</button>
       </div>
     </div>
@@ -1198,6 +1261,41 @@ function guardarDesdeModal() {
   guardarVenta();
 }
 
+function enviarWhatsApp() {
+  const items = getItems();
+  const factNum  = document.getElementById('facturaNum').value || 'FAC-0001';
+  const cliente  = document.getElementById('clienteNombre').value || 'Cliente';
+  const clienteTel = document.getElementById('clienteTel').value || '';
+  const sub      = items.reduce((a,i)=>a+i.total, 0);
+  const useIva   = document.getElementById('ivaCheck').checked;
+  const iva      = useIva ? sub*0.19 : 0;
+  const total    = sub + iva;
+  const estado   = document.getElementById('estado').value;
+  const emisor   = document.getElementById('cfgEmisorNombre').value || 'Hawk Lock';
+  const tel      = document.getElementById('cfgEmisorTel').value || '3126332199';
+
+  const itemsText = items.map(i => '  • ' + i.desc + ' x' + i.qty + ' = ' + fmt(i.total)).join('%0A');
+
+  const msg = '🦅 *' + emisor + '*%0A' +
+    '━━━━━━━━━━━━━━━━━━%0A' +
+    '📄 *Factura:* ' + factNum + '%0A' +
+    '👤 *Cliente:* ' + cliente + '%0A' +
+    '━━━━━━━━━━━━━━━━━━%0A' +
+    '*Productos:*%0A' + itemsText + '%0A' +
+    '━━━━━━━━━━━━━━━━━━%0A' +
+    '💰 *Subtotal:* ' + fmt(sub) + '%0A' +
+    (useIva ? '💰 *IVA (19%):* ' + fmt(iva) + '%0A' : '') +
+    '✅ *TOTAL: ' + fmt(total) + '*%0A' +
+    '📋 *Estado:* ' + estado + '%0A' +
+    '━━━━━━━━━━━━━━━━━━%0A' +
+    '_Gracias por tu compra_ 🙏';
+
+  // Try to send to client's number, fallback to business number
+  const numero = clienteTel.replace(/[^0-9]/g,'') || tel.replace(/[^0-9]/g,'');
+  const waNum  = numero.startsWith('57') ? numero : '57' + numero;
+  window.open('https://wa.me/' + waNum + '?text=' + msg, '_blank');
+}
+
 // ── HISTORIAL ─────────────────────────────────────────
 function renderHistorial() {
   const list = document.getElementById('historialList');
@@ -1439,15 +1537,58 @@ function showToast(msg, type='info') {
 }
 
 
+
+function enviarWhatsApp() {
+  const items = getItems();
+  const factNum  = document.getElementById('facturaNum').value || 'FAC-0001';
+  const cliente  = document.getElementById('clienteNombre').value || 'Cliente';
+  const clienteTel = document.getElementById('clienteTel').value || '';
+  const sub      = items.reduce((a,i)=>a+i.total, 0);
+  const useIva   = document.getElementById('ivaCheck').checked;
+  const iva      = useIva ? sub*0.19 : 0;
+  const total    = sub + iva;
+  const estado   = document.getElementById('estado').value;
+  const emisor   = document.getElementById('cfgEmisorNombre').value || 'Hawk Lock';
+  const tel      = document.getElementById('cfgEmisorTel').value || '3126332199';
+  const itemsText = items.map(i => '  %E2%80%A2 ' + i.desc + ' x' + i.qty + ' = ' + fmt(i.total)).join('%0A');
+  const msg = '%F0%9F%A6%85 *' + emisor + '*%0A' +
+    '%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A' +
+    '%F0%9F%93%84 *Factura:* ' + factNum + '%0A' +
+    '%F0%9F%91%A4 *Cliente:* ' + cliente + '%0A' +
+    '%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A' +
+    '*Productos:*%0A' + itemsText + '%0A' +
+    '%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A' +
+    '%F0%9F%92%B0 *Subtotal:* ' + fmt(sub) + '%0A' +
+    (useIva ? '%F0%9F%92%B0 *IVA (19%25):* ' + fmt(iva) + '%0A' : '') +
+    '%E2%9C%85 *TOTAL: ' + fmt(total) + '*%0A' +
+    '%F0%9F%93%8B *Estado:* ' + estado + '%0A' +
+    '%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%E2%94%80%0A' +
+    '_Gracias por tu compra_ %F0%9F%99%8F';
+  const numero = clienteTel.replace(/[^0-9]/g,'') || tel.replace(/[^0-9]/g,'');
+  const waNum  = numero.startsWith('57') ? numero : '57' + numero;
+  window.open('https://wa.me/' + waNum + '?text=' + msg, '_blank');
+}
+
 // ══ GASTOS ════════════════════════════════════════════
 function calcGasto() {
   const cant  = parseFloat(document.getElementById('gastoCantidad').value)||0;
   const costo = parseFloat(document.getElementById('gastoCosto').value)||0;
   const iva   = parseFloat(document.getElementById('gastoIva').value)||0;
+  const abono = parseFloat(document.getElementById('gastoAbono').value)||0;
   const sub   = cant * costo;
+  const total = sub + iva;
+  const pend  = Math.max(0, total - abono);
   document.getElementById('gastoSubtotalDisplay').textContent = fmt(sub);
   document.getElementById('gastoIvaDisplay').textContent      = fmt(iva);
-  document.getElementById('gastoTotalDisplay').textContent    = fmt(sub + iva);
+  document.getElementById('gastoTotalDisplay').textContent    = fmt(total);
+  document.getElementById('gastoPendiente').value = pend;
+  // Auto-set estado
+  const estadoEl = document.getElementById('gastoEstado');
+  if (total > 0) {
+    if (abono === 0)          estadoEl.value = 'Pendiente';
+    else if (abono >= total)  estadoEl.value = 'Pagado';
+    else                      estadoEl.value = 'Abono';
+  }
 }
 
 async function guardarGasto() {
@@ -1462,6 +1603,7 @@ async function guardarGasto() {
   const costo = parseFloat(document.getElementById('gastoCosto').value)||0;
   const iva   = parseFloat(document.getElementById('gastoIva').value)||0;
 
+  const abono = parseFloat(document.getElementById('gastoAbono').value)||0;
   const payload = {
     action:     'guardarGasto',
     fecha:      document.getElementById('gastoFecha').value || new Date().toISOString().split('T')[0],
@@ -1471,8 +1613,9 @@ async function guardarGasto() {
     cantidad:   cant,
     costoUnit:  costo,
     iva,
+    abono,
     estado:     document.getElementById('gastoEstado').value,
-    pendiente:  document.getElementById('gastoPendiente').value||0
+    pendiente:  parseFloat(document.getElementById('gastoPendiente').value)||0
   };
 
   try {
@@ -1488,6 +1631,7 @@ async function guardarGasto() {
       document.getElementById('gastoCantidad').value  = '1';
       document.getElementById('gastoCosto').value     = '0';
       document.getElementById('gastoIva').value       = '0';
+      document.getElementById('gastoAbono').value     = '0';
       document.getElementById('gastoPendiente').value = '0';
       calcGasto();
       cargarGastosCloud();
@@ -1545,9 +1689,9 @@ async function cargarGastosCloud() {
         '<div style="font-size:13px;color:var(--hawk-silver-dim);margin:3px 0">' + g.producto + ' · ' + g.categoria + '</div>' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">' +
           '<div class="hist-total" style="color:#ef4444;font-size:16px">-' + fmt(totalG) + '</div>' +
-          (pendiente > 0 ? '<div style="font-size:11px;color:#f59e0bletter-spacing:1px">⚠ Pendiente: ' + fmt(pendiente) + '</div>' : '') +
+          (pendiente > 0 ? '<div style="font-size:11px;color:#f59e0b;letter-spacing:1px">⚠ Pendiente: ' + fmt(pendiente) + '</div>' : '') +
         '</div>' +
-        '<div style="font-size:11px;color:var(--hawk-silver-dim);margin-top:4pxletter-spacing:1px">' +
+        '<div style="font-size:11px;color:var(--hawk-silver-dim);margin-top:4px;letter-spacing:1px">' +
           'Cant: ' + cant + ' · Costo unit: ' + fmt(costoU) + (ivaG > 0 ? ' · IVA: ' + fmt(ivaG) : '') +
         '</div>' +
       '</div>';
@@ -1579,6 +1723,62 @@ async function recargarInventarioCloud() {
   } catch(e) {
     showToast('⚠ Sin conexión — carga el Excel manualmente', 'error');
   }
+}
+
+
+// ══ PIN ═══════════════════════════════════════════════
+const PIN_DEFAULT = '1234';
+let pinBuffer = '';
+
+function pinPress(num) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += num;
+  updatePinDots();
+  if (pinBuffer.length === 4) {
+    setTimeout(checkPin, 200);
+  }
+}
+
+function pinDel() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots();
+  document.getElementById('pinError').textContent = '';
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('pd' + i).classList.toggle('filled', i < pinBuffer.length);
+  }
+}
+
+function checkPin() {
+  const saved = localStorage.getItem('hl_pin') || PIN_DEFAULT;
+  if (pinBuffer === saved) {
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('pinError').textContent = '';
+  } else {
+    document.getElementById('pinError').textContent = '❌ PIN incorrecto, intenta de nuevo';
+    pinBuffer = '';
+    updatePinDots();
+    // Shake effect
+    const screen = document.getElementById('pinScreen');
+    screen.style.animation = 'none';
+    setTimeout(() => { screen.style.animation = ''; }, 10);
+  }
+}
+
+function pinChangePrompt() {
+  const current = prompt('Ingresa tu PIN actual:');
+  if (!current) return;
+  const saved = localStorage.getItem('hl_pin') || PIN_DEFAULT;
+  if (current !== saved) { alert('PIN incorrecto'); return; }
+  const newPin = prompt('Ingresa el nuevo PIN (4 dígitos):');
+  if (!newPin || newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+    alert('El PIN debe ser exactamente 4 dígitos numéricos');
+    return;
+  }
+  localStorage.setItem('hl_pin', newPin);
+  alert('✅ PIN actualizado correctamente');
 }
 
 // ── START ─────────────────────────────────────────────
