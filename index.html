@@ -292,6 +292,42 @@
   .badge-red { background:rgba(239,68,68,0.15); border:1px solid #ef4444; color:#ef4444; }
 
 
+
+  /* ── URL PASSWORD SCREEN ── */
+  #urlPassScreen {
+    position: fixed; inset: 0; background: #020408;
+    z-index: 99999; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 40px 24px;
+  }
+  #urlPassScreen.hidden { display: none; }
+  .upass-logo { font-family: 'Rajdhani', sans-serif; font-size: 32px; font-weight: 700;
+    letter-spacing: 8px; color: #f0f4f8; margin-bottom: 4px; }
+  .upass-sub { font-size: 10px; color: #3a5070; letter-spacing: 4px;
+    text-transform: uppercase; margin-bottom: 50px; }
+  .upass-label { font-size: 10px; color: #4a6080; letter-spacing: 3px;
+    text-transform: uppercase; margin-bottom: 10px; text-align: center; }
+  .upass-input {
+    background: #0d1117; border: 1px solid #1a2535; border-radius: 10px;
+    color: #f0f4f8; font-size: 18px; padding: 14px 20px; width: 100%;
+    max-width: 300px; text-align: center; letter-spacing: 4px;
+    outline: none; margin-bottom: 14px; font-family: 'Barlow', sans-serif;
+    transition: border-color 0.2s;
+  }
+  .upass-input:focus { border-color: #1d72e8; }
+  .upass-btn {
+    background: linear-gradient(135deg, #1d72e8, #1558c0);
+    color: #fff; border: none; border-radius: 10px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 13px;
+    font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+    padding: 14px 40px; cursor: pointer; width: 100%; max-width: 300px;
+    box-shadow: 0 4px 20px rgba(29,114,232,0.3); transition: all 0.2s;
+  }
+  .upass-btn:active { transform: scale(0.98); }
+  .upass-error { color: #ef4444; font-size: 12px; letter-spacing: 1px;
+    margin-top: 14px; min-height: 18px; text-align: center; }
+  .upass-attempts { color: #3a5070; font-size: 10px; letter-spacing: 1px;
+    margin-top: 30px; text-align: center; }
+
   /* ── PIN SCREEN ── */
   #pinScreen {
     position: fixed; inset: 0; background: var(--hawk-black);
@@ -335,10 +371,32 @@
 
 <!-- ══════════════ FACTURACIÓN PAGE ══════════════ -->
 
+
+<!-- URL PASSWORD SCREEN -->
+<div id="urlPassScreen">
+  <div class="upass-logo">🦅 HAWK LOCK</div>
+  <div class="upass-sub">Sistema Empresarial Privado</div>
+  <div class="upass-label">Contraseña de acceso</div>
+  <input type="password" class="upass-input" id="urlPassInput" 
+    placeholder="••••••••" maxlength="20"
+    onkeydown="if(event.key==='Enter') checkUrlPass()"
+    autocomplete="off">
+  <button class="upass-btn" onclick="checkUrlPass()">🔐 Ingresar</button>
+  <div class="upass-error" id="urlPassError"></div>
+  <div class="upass-attempts" id="urlPassAttempts"></div>
+</div>
+
 <!-- PIN SCREEN -->
 <div id="pinScreen">
   <div class="pin-logo">🦅 HAWK LOCK</div>
   <div class="pin-sub">Sistema de Facturación</div>
+  <div style="margin-bottom:20px;width:100%;max-width:280px">
+    <label style="font-size:10px;color:#4a6080;letter-spacing:2px;text-transform:uppercase;display:block;margin-bottom:6px">Usuario</label>
+    <select id="usuarioSelect" style="width:100%;background:#0d1117;border:1px solid #1a2535;border-radius:8px;color:#f0f4f8;font-size:15px;padding:10px 12px;outline:none;-webkit-appearance:none">
+      <option value="admin">👑 Administrador</option>
+      <option value="vendedor1">👤 Vendedor 1</option>
+    </select>
+  </div>
   <div class="pin-dots">
     <div class="pin-dot" id="pd0"></div>
     <div class="pin-dot" id="pd1"></div>
@@ -434,6 +492,11 @@
         <option>Pendiente de pago</option>
         <option>Anulada</option>
       </select>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Vendedor</label>
+      <input type="text" id="vendedor" placeholder="Nombre del vendedor" readonly
+        style="opacity:0.7;background:rgba(29,114,232,0.05)">
     </div>
     <div class="form-group" style="margin-bottom:12px">
       <label>Notas / Observaciones</label>
@@ -558,8 +621,12 @@
         Exporta el historial para hacer respaldo.
       </p>
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="exportarHistorial()" style="font-size:11px">📤 Exportar historial CSV</button>
-        <button class="btn btn-danger" onclick="limpiarHistorial()" style="font-size:11px">🗑 Limpiar historial</button>
+        <button class="btn btn-secondary" onclick="exportarHistorial()" style="font-size:11px">📤 Exportar CSV</button>
+        <button class="btn btn-danger" onclick="limpiarHistorial()" style="font-size:11px">🗑 Limpiar</button>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn btn-secondary" onclick="pinChangePrompt()" style="font-size:11px">🔑 Cambiar mi PIN</button>
+        <button class="btn btn-secondary" onclick="cambiarContrasenaUrl()" style="font-size:11px">🔐 Cambiar contraseña</button>
       </div>
     </div>
   </div>
@@ -749,11 +816,28 @@ let _pendingVenta = null; // venta pendiente desde modal
 
 // ── INIT ─────────────────────────────────────────────
 function init() {
+  initUrlPass();
   loadConfig();
+  loadUserPins();
+  setVendedorField();
   document.getElementById('facturaFecha').valueAsDate = new Date();
   addItem(); addItem();
   cargarFacturasCloud();
-  recargarInventarioCloud(); // Cargar inventario automáticamente desde la nube
+  recargarInventarioCloud();
+}
+
+function loadUserPins() {
+  const saved = JSON.parse(localStorage.getItem('hl_pins') || '{}');
+  Object.keys(saved).forEach(k => { if (USUARIOS[k]) USUARIOS[k].pin = saved[k]; });
+}
+
+function setVendedorField() {
+  const u = JSON.parse(localStorage.getItem('hl_usuario_actual') || 'null');
+  if (u) {
+    usuarioActual = u;
+    const el = document.getElementById('vendedor');
+    if (el) el.value = u.nombre;
+  }
 }
 
 // ── TABS ─────────────────────────────────────────────
@@ -1230,6 +1314,7 @@ async function guardarVenta() {
     clienteDir: document.getElementById('clienteDir').value,
     estado:     document.getElementById('estado').value,
     notas:      document.getElementById('notas').value,
+    vendedor:   usuarioActual ? usuarioActual.nombre : 'Admin',
     useIva,
     items,
     subtotal:   sub,
@@ -1726,6 +1811,64 @@ async function recargarInventarioCloud() {
 }
 
 
+
+// ══ URL PASSWORD + USUARIO SYSTEM ════════════════════
+const URL_PASS_DEFAULT = 'hawklock2024'; // Contraseña maestra — cámbiala
+let urlPassAttempts = 0;
+const MAX_ATTEMPTS = 5;
+
+// Usuarios del sistema
+const USUARIOS = {
+  'admin': { pin: '1234', nombre: 'Administrador', rol: 'admin' },
+  'vendedor1': { pin: '5678', nombre: 'Vendedor 1', rol: 'vendedor' }
+};
+
+let usuarioActual = null;
+
+function checkUrlPass() {
+  const input = document.getElementById('urlPassInput').value.trim();
+  const saved = localStorage.getItem('hl_url_pass') || URL_PASS_DEFAULT;
+
+  if (input === saved) {
+    // Guardar sesión por 8 horas
+    localStorage.setItem('hl_session', Date.now().toString());
+    document.getElementById('urlPassScreen').classList.add('hidden');
+    document.getElementById('urlPassError').textContent = '';
+    urlPassAttempts = 0;
+  } else {
+    urlPassAttempts++;
+    const restantes = MAX_ATTEMPTS - urlPassAttempts;
+    document.getElementById('urlPassError').textContent = '❌ Contraseña incorrecta';
+    document.getElementById('urlPassAttempts').textContent =
+      restantes > 0 ? 'Intentos restantes: ' + restantes : '🔒 Demasiados intentos — recarga la página';
+    document.getElementById('urlPassInput').value = '';
+
+    if (urlPassAttempts >= MAX_ATTEMPTS) {
+      document.getElementById('urlPassInput').disabled = true;
+      document.querySelector('.upass-btn').disabled = true;
+    }
+  }
+}
+
+function checkSession() {
+  const session = localStorage.getItem('hl_session');
+  if (!session) return false;
+  const elapsed = Date.now() - parseInt(session);
+  const hours8 = 8 * 60 * 60 * 1000;
+  return elapsed < hours8;
+}
+
+function initUrlPass() {
+  if (checkSession()) {
+    document.getElementById('urlPassScreen').classList.add('hidden');
+  }
+  // Enter key support
+  document.getElementById('urlPassInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') checkUrlPass();
+  });
+}
+
+
 // ══ PIN ═══════════════════════════════════════════════
 const PIN_DEFAULT = '1234';
 let pinBuffer = '';
@@ -1752,33 +1895,59 @@ function updatePinDots() {
 }
 
 function checkPin() {
-  const saved = localStorage.getItem('hl_pin') || PIN_DEFAULT;
-  if (pinBuffer === saved) {
+  const usuarioKey = document.getElementById('usuarioSelect').value;
+  const usuario = USUARIOS[usuarioKey];
+  const pinCorrecto = usuario ? usuario.pin : (localStorage.getItem('hl_pin') || PIN_DEFAULT);
+
+  if (pinBuffer === pinCorrecto) {
+    usuarioActual = { key: usuarioKey, ...usuario };
+    localStorage.setItem('hl_usuario_actual', JSON.stringify(usuarioActual));
     document.getElementById('pinScreen').classList.add('hidden');
     document.getElementById('pinError').textContent = '';
+    // Mostrar nombre en config
+    const badge = document.getElementById('syncBadge');
+    if (badge) badge.title = 'Usuario: ' + usuario.nombre;
+    showToast('👋 Bienvenido, ' + usuario.nombre, 'success');
+    const vEl = document.getElementById('vendedor');
+    if (vEl) vEl.value = usuario.nombre;
   } else {
-    document.getElementById('pinError').textContent = '❌ PIN incorrecto, intenta de nuevo';
+    document.getElementById('pinError').textContent = '❌ PIN incorrecto para ' + (usuario ? usuario.nombre : 'este usuario');
     pinBuffer = '';
     updatePinDots();
-    // Shake effect
-    const screen = document.getElementById('pinScreen');
-    screen.style.animation = 'none';
-    setTimeout(() => { screen.style.animation = ''; }, 10);
   }
 }
 
 function pinChangePrompt() {
+  if (!usuarioActual) { alert('Debes iniciar sesión primero'); return; }
+  const usuarioKey = usuarioActual.key;
   const current = prompt('Ingresa tu PIN actual:');
   if (!current) return;
-  const saved = localStorage.getItem('hl_pin') || PIN_DEFAULT;
-  if (current !== saved) { alert('PIN incorrecto'); return; }
+  if (current !== USUARIOS[usuarioKey].pin) { alert('PIN incorrecto'); return; }
   const newPin = prompt('Ingresa el nuevo PIN (4 dígitos):');
   if (!newPin || newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
     alert('El PIN debe ser exactamente 4 dígitos numéricos');
     return;
   }
-  localStorage.setItem('hl_pin', newPin);
-  alert('✅ PIN actualizado correctamente');
+  USUARIOS[usuarioKey].pin = newPin;
+  // Guardar en localStorage
+  localStorage.setItem('hl_pins', JSON.stringify(
+    Object.fromEntries(Object.entries(USUARIOS).map(([k,v]) => [k, v.pin]))
+  ));
+  alert('✅ PIN de ' + usuarioActual.nombre + ' actualizado');
+}
+
+function cambiarContrasenaUrl() {
+  if (!usuarioActual || usuarioActual.rol !== 'admin') {
+    alert('Solo el administrador puede cambiar la contraseña de acceso');
+    return;
+  }
+  const current = prompt('Contraseña actual:');
+  const saved = localStorage.getItem('hl_url_pass') || URL_PASS_DEFAULT;
+  if (current !== saved) { alert('Contraseña incorrecta'); return; }
+  const nueva = prompt('Nueva contraseña (mínimo 8 caracteres):');
+  if (!nueva || nueva.length < 8) { alert('Mínimo 8 caracteres'); return; }
+  localStorage.setItem('hl_url_pass', nueva);
+  alert('✅ Contraseña de acceso actualizada');
 }
 
 // ── START ─────────────────────────────────────────────
