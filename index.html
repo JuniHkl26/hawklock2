@@ -797,6 +797,7 @@
 <!-- TOAST -->
 <div id="toast"></div>
 
+<script src="./app-config.js"></script>
 <script>
 // ══════════════════════════════════════════════════════
 //  HAWK LOCK — Sistema de Facturación
@@ -804,7 +805,64 @@
 //  iPhone + PC comparten la misma base de datos
 // ══════════════════════════════════════════════════════
 
-const GS_URL = 'https://script.google.com/macros/s/AKfycby0J0kzVDsHASiSB1UwIe--I6fwPrsBbCA7_HNYbBxUOqvWi2RXmsK6Z4BkCUKuPaRe/exec';
+const APP_CONFIG = window.APP_CONFIG || {};
+const GS_URL = APP_CONFIG.GS_URL || 'https://script.google.com/macros/s/AKfycby0J0kzVDsHASiSB1UwIe--I6fwPrsBbCA7_HNYbBxUOqvWi2RXmsK6Z4BkCUKuPaRe/exec';
+const GS_API_KEY = APP_CONFIG.GS_API_KEY || '';
+
+async function apiFetch(action, { method='GET', payload=null, timeoutMs=15000 } = {}) {
+  if (!GS_URL) throw new Error('GS_URL no configurada');
+  if (!GS_API_KEY) throw new Error('GS_API_KEY no configurada');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const isGet = method.toUpperCase() === 'GET';
+    const origin = window.location.origin || '';
+    const query = `action=${encodeURIComponent(action)}&apiKey=${encodeURIComponent(GS_API_KEY)}&origin=${encodeURIComponent(origin)}`;
+    const url = isGet
+      ? `${GS_URL}${GS_URL.includes('?') ? '&' : '?'}${query}`
+      : GS_URL;
+
+    const headers = {
+      'X-API-Key': GS_API_KEY,
+      'Accept': 'application/json'
+    };
+
+    const options = {
+      method,
+      headers,
+      signal: controller.signal
+    };
+
+    if (!isGet) {
+      headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify({ action, apiKey: GS_API_KEY, origin, ...(payload || {}) });
+    }
+
+    const res = await fetch(url, options);
+    const text = await res.text();
+    let data = null;
+
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (_) {
+      throw new Error(`Respuesta inválida del servidor (${res.status})`);
+    }
+
+    if (!res.ok) {
+      throw new Error((data && data.msg) ? data.msg : `Error HTTP ${res.status}`);
+    }
+
+    if (!data || data.ok !== true) {
+      throw new Error((data && data.msg) ? data.msg : 'Operación rechazada por el servidor');
+    }
+
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const LOGO = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMjAgNjAiPgogIDxyZWN0IHdpZHRoPSIyMjAiIGhlaWdodD0iNjAiIGZpbGw9Im5vbmUiLz4KICA8dGV4dCB4PSI4IiB5PSIzOCIgZm9udC1mYW1pbHk9IkFyaWFsIEJsYWNrLEFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNmMGY0ZjgiIGxldHRlci1zcGFjaW5nPSIxIj5IQVdLPC90ZXh0PgogIDx0ZXh0IHg9IjgiIHk9IjU2IiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMyIgZm9udC13ZWlnaHQ9IjQwMCIgZmlsbD0iIzFkNzJlOCIgbGV0dGVyLXNwYWNpbmc9IjQiPkxPQ0s8L3RleHQ+CiAgPHJlY3QgeD0iMTEyIiB5PSIxMCIgd2lkdGg9IjMiIGhlaWdodD0iNDQiIGZpbGw9IiMxZDcyZTgiIHJ4PSIxIi8+CiAgPHRleHQgeD0iMTIyIiB5PSIzOCIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI0MDAiIGZpbGw9IiM3YTkwYTYiIGxldHRlci1zcGFjaW5nPSIyIj5TRUdVUklEQUQ8L3RleHQ+CiAgPHRleHQgeD0iMTIyIiB5PSI1NCIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iOSIgZm9udC13ZWlnaHQ9IjQwMCIgZmlsbD0iIzNkNjA4MCIgbGV0dGVyLXNwYWNpbmc9IjIiPlZFSElDVUxBUjwvdGV4dD4KPC9zdmc+";
 
@@ -818,6 +876,10 @@ let _pendingVenta = null; // venta pendiente desde modal
 
 // ── INIT ─────────────────────────────────────────────
 function init() {
+  if (!GS_API_KEY) {
+    console.warn('GS_API_KEY no configurada en app-config.js');
+    showToast('⚠ Configura la API Key en app-config.js para sincronizar', 'error');
+  }
   initUrlPass();
   loadConfig();
   loadUserPins();
@@ -889,46 +951,39 @@ function setSyncStatus(status) {
 async function cargarFacturasCloud() {
   setSyncStatus('syncing');
   try {
-    const res = await fetch(GS_URL + '?action=getFacturas');
-    const data = await res.json();
-    if (data.ok) {
-      // Convert cloud rows to app format
-      const blacklist = JSON.parse(localStorage.getItem('hl_blacklist') || '[]');
-      facturas = data.facturas.map(r => ({
-        id:         r.id,
-        factura:    r.factura,
-        fecha:      r.fecha,
-        cliente:    r.cliente,
-        clienteId:  r.clienteId,
-        clienteTel: r.clienteTel,
-        clienteDir: r.clienteDir,
-        estado:     r.estado,
-        notas:      r.notas,
-        useIva:     r.iva > 0,
-        subtotal:   parseFloat(r.subtotal)||0,
-        iva:        parseFloat(r.iva)||0,
-        total:      parseFloat(r.total)||0,
-        items:      (r.itemsStr||'').split(' | ').filter(Boolean).map(s => {
-          const m = s.match(/^(.+)x(\d+(?:\.\d+)?)(?:@(.+))?$/);
-          if (m) return {desc: m[1].trim(), qty: parseFloat(m[2])||1, price: parseFloat((m[3]||'0').replace(/[$.,]/g,''))||0, total: 0};
-          return {desc: s, qty: 1, price: 0, total: 0};
-        })
-      })).filter(f => !blacklist.includes(String(f.id))).reverse();
-      setSyncStatus('ok');
-      updateFacturaNumFromHistorial();
-      renderHistorial();
-      renderStats();
-    } else {
-      throw new Error(data.msg || 'Error desconocido');
-    }
+    const data = await apiFetch('getFacturas');
+    const blacklist = JSON.parse(localStorage.getItem('hl_blacklist') || '[]');
+    facturas = data.facturas.map(r => ({
+      id:         r.id,
+      factura:    r.factura,
+      fecha:      r.fecha,
+      cliente:    r.cliente,
+      clienteId:  r.clienteId,
+      clienteTel: r.clienteTel,
+      clienteDir: r.clienteDir,
+      estado:     r.estado,
+      notas:      r.notas,
+      useIva:     r.iva > 0,
+      subtotal:   parseFloat(r.subtotal)||0,
+      iva:        parseFloat(r.iva)||0,
+      total:      parseFloat(r.total)||0,
+      items:      (r.itemsStr||'').split(' | ').filter(Boolean).map(s => {
+        const m = s.match(/^(.+)x(\d+(?:\.\d+)?)(?:@(.+))?$/);
+        if (m) return {desc: m[1].trim(), qty: parseFloat(m[2])||1, price: parseFloat((m[3]||'0').replace(/[$.,]/g,''))||0, total: 0};
+        return {desc: s, qty: 1, price: 0, total: 0};
+      })
+    })).filter(f => !blacklist.includes(String(f.id))).reverse();
+    setSyncStatus('ok');
+    updateFacturaNumFromHistorial();
+    renderHistorial();
+    renderStats();
   } catch(e) {
+    console.error('Error cargarFacturasCloud:', e);
     setSyncStatus('error');
-    // Fallback to localStorage
     try { facturas = JSON.parse(localStorage.getItem('hl_facturas') || '[]'); } catch(_) { facturas = []; }
     updateFacturaNumFromHistorial();
     renderHistorial();
     renderStats();
-    // Silent on startup — user will see sync badge in red
   }
 }
 
@@ -936,7 +991,6 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
   setSyncStatus('syncing');
   try {
     const payload = {
-      action:       'guardarFactura',
       id:           String(venta.id),
       factura:      venta.factura,
       fecha:        venta.fecha,
@@ -952,22 +1006,16 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
       notas:        venta.notas,
       stockUpdates: stockUpdates
     };
-    const res = await fetch(GS_URL, {
+    await apiFetch('guardarFactura', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      payload
     });
-    const data = await res.json();
-    if (data.ok) {
-      setSyncStatus('ok');
-      // Also save to local as backup
-      localStorage.setItem('hl_facturas', JSON.stringify(facturas));
-      return true;
-    } else {
-      throw new Error(data.msg);
-    }
+    setSyncStatus('ok');
+    localStorage.setItem('hl_facturas', JSON.stringify(facturas));
+    return true;
   } catch(e) {
+    console.error('Error guardarFacturaCloud:', e);
     setSyncStatus('error');
-    // Save locally as fallback
     localStorage.setItem('hl_facturas', JSON.stringify(facturas));
     showToast('⚠ Guardado local — reintenta cuando tengas conexión', 'error');
     return false;
@@ -976,13 +1024,13 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
 
 async function anularFacturaCloud(id) {
   try {
-    const res = await fetch(GS_URL, {
+    await apiFetch('anularFactura', {
       method: 'POST',
-      body: JSON.stringify({action: 'anularFactura', id: String(id)})
+      payload: { id: String(id) }
     });
-    const data = await res.json();
-    return data.ok;
+    return true;
   } catch(e) {
+    console.error('Error anularFacturaCloud:', e);
     return false;
   }
 }
@@ -1689,10 +1737,9 @@ async function guardarGasto() {
   const cant  = parseFloat(document.getElementById('gastoCantidad').value)||1;
   const costo = parseFloat(document.getElementById('gastoCosto').value)||0;
   const iva   = parseFloat(document.getElementById('gastoIva').value)||0;
-
   const abono = parseFloat(document.getElementById('gastoAbono').value)||0;
+
   const payload = {
-    action:     'guardarGasto',
     fecha:      document.getElementById('gastoFecha').value || new Date().toISOString().split('T')[0],
     proveedor,
     producto,
@@ -1707,38 +1754,34 @@ async function guardarGasto() {
 
   try {
     setSyncStatus('syncing');
-    const res  = await fetch(GS_URL, {method:'POST', body:JSON.stringify(payload)});
-    const data = await res.json();
-    if (data.ok) {
-      setSyncStatus('ok');
-      showToast('✅ Gasto ' + data.comNum + ' registrado en Excel', 'success');
-      // Reset form
-      document.getElementById('gastoProveedor').value = '';
-      document.getElementById('gastoProducto').value  = '';
-      document.getElementById('gastoCantidad').value  = '1';
-      document.getElementById('gastoCosto').value     = '0';
-      document.getElementById('gastoIva').value       = '0';
-      document.getElementById('gastoAbono').value     = '0';
-      document.getElementById('gastoPendiente').value = '0';
-      calcGasto();
-      cargarGastosCloud();
-    } else {
-      throw new Error(data.msg || 'Error');
-    }
+    const data = await apiFetch('guardarGasto', { method:'POST', payload });
+    setSyncStatus('ok');
+    showToast('✅ Gasto ' + (data.comNum || '') + ' registrado en Excel', 'success');
+
+    document.getElementById('gastoProveedor').value = '';
+    document.getElementById('gastoProducto').value  = '';
+    document.getElementById('gastoCantidad').value  = '1';
+    document.getElementById('gastoCosto').value     = '0';
+    document.getElementById('gastoIva').value       = '0';
+    document.getElementById('gastoAbono').value     = '0';
+    document.getElementById('gastoPendiente').value = '0';
+    calcGasto();
+    cargarGastosCloud();
   } catch(err) {
+    console.error('Error guardarGasto:', err);
     setSyncStatus('error');
     showToast('⚠ Error al guardar gasto: ' + err.message, 'error');
   }
+
   if (btn) { btn.disabled=false; btn.textContent='💾 Registrar gasto'; }
 }
 
 async function cargarGastosCloud() {
   try {
-    const res  = await fetch(GS_URL + '?action=getGastos');
-    const data = await res.json();
+    const data = await apiFetch('getGastos');
     const list = document.getElementById('gastosList');
     const badge = document.getElementById('gastosCountBadge');
-    if (!data.ok || !data.gastos.length) {
+    if (!data.gastos.length) {
       if (badge) badge.textContent = '0 gastos';
       list.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div><p>No hay gastos registrados aún</p></div>';
       return;
@@ -1784,6 +1827,7 @@ async function cargarGastosCloud() {
       '</div>';
     }).join('');
   } catch(e) {
+    console.error('Error cargarGastosCloud:', e);
     document.getElementById('gastosList').innerHTML =
       '<div class="empty-state"><div class="empty-icon">⚠</div><p>Sin conexión</p></div>';
   }
@@ -1793,9 +1837,8 @@ async function cargarGastosCloud() {
 async function recargarInventarioCloud() {
   showToast('⏳ Recargando inventario...', 'info');
   try {
-    const res = await fetch(GS_URL + '?action=getInventario');
-    const data = await res.json();
-    if (data.ok && data.productos && data.productos.length) {
+    const data = await apiFetch('getInventario');
+    if (data.productos && data.productos.length) {
       inventario = data.productos;
       updateInvBadge();
       renderInventario();
@@ -1808,6 +1851,7 @@ async function recargarInventarioCloud() {
       showToast('⚠ Sin datos de inventario en la nube. Carga el Excel manualmente.', 'error');
     }
   } catch(e) {
+    console.error('Error recargarInventarioCloud:', e);
     showToast('⚠ Sin conexión — carga el Excel manualmente', 'error');
   }
 }
