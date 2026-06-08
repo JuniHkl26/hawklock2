@@ -807,37 +807,23 @@
 
 const APP_CONFIG = window.APP_CONFIG || {};
 const GS_URL = APP_CONFIG.GS_URL || 'https://script.google.com/macros/s/AKfycby0J0kzVDsHASiSB1UwIe--I6fwPrsBbCA7_HNYbBxUOqvWi2RXmsK6Z4BkCUKuPaRe/exec';
-const GS_API_KEY = APP_CONFIG.GS_API_KEY || '';
+const GS_API_KEY = ''; // no requerida
 
-async function apiFetch(action, { method='GET', payload=null, timeoutMs=15000 } = {}) {
+async function apiFetch(action, { method='GET', payload=null } = {}) {
   if (!GS_URL) throw new Error('GS_URL no configurada');
-  if (!GS_API_KEY) throw new Error('GS_API_KEY no configurada');
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const isGet = method.toUpperCase() === 'GET';
-    const origin = window.location.origin || '';
-    const query = `action=${encodeURIComponent(action)}&apiKey=${encodeURIComponent(GS_API_KEY)}&origin=${encodeURIComponent(origin)}`;
+    const query = `action=${encodeURIComponent(action)}`;
     const url = isGet
       ? `${GS_URL}${GS_URL.includes('?') ? '&' : '?'}${query}`
       : GS_URL;
 
-    const headers = {
-      'X-API-Key': GS_API_KEY,
-      'Accept': 'application/json'
-    };
+    const options = { method };
 
-    const options = {
-      method,
-      headers,
-      signal: controller.signal
-    };
-
-    if (!isGet) {
-      headers['Content-Type'] = 'application/json';
-      options.body = JSON.stringify({ action, apiKey: GS_API_KEY, origin, ...(payload || {}) });
+    if (!isGet && payload) {
+      options.headers = { 'Content-Type': 'text/plain' };
+      options.body = JSON.stringify({ action, ...(payload || {}) });
     }
 
     const res = await fetch(url, options);
@@ -859,8 +845,8 @@ async function apiFetch(action, { method='GET', payload=null, timeoutMs=15000 } 
     }
 
     return data;
-  } finally {
-    clearTimeout(timer);
+  } catch(e) {
+    throw e;
   }
 }
 
@@ -876,10 +862,6 @@ let _pendingVenta = null; // venta pendiente desde modal
 
 // ── INIT ─────────────────────────────────────────────
 function init() {
-  if (!GS_API_KEY) {
-    console.warn('GS_API_KEY no configurada en app-config.js');
-    showToast('⚠ Configura la API Key en app-config.js para sincronizar', 'error');
-  }
   initUrlPass();
   loadConfig();
   loadUserPins();
