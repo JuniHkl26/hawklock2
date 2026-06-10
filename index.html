@@ -553,6 +553,25 @@
     <div class="topbar-badge" id="histCountBadge">0 facturas</div>
   </div>
 
+  <!-- FILTROS -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+    <input type="date" id="filtroFecha" onchange="renderHistorial()"
+      style="flex:1;min-width:130px;background:var(--hawk-card);border:1px solid var(--hawk-border);color:var(--hawk-silver);padding:8px 10px;border-radius:8px;font-size:13px;">
+    <select id="filtroEstado" onchange="renderHistorial()"
+      style="flex:1;min-width:120px;background:var(--hawk-card);border:1px solid var(--hawk-border);color:var(--hawk-silver);padding:8px 10px;border-radius:8px;font-size:13px;">
+      <option value="">Todos los estados</option>
+      <option value="Pagada">Pagada</option>
+      <option value="Pendiente">Pendiente</option>
+      <option value="Anulada">Anulada</option>
+    </select>
+    <button onclick="limpiarFiltros()"
+      style="background:rgba(255,255,255,0.05);border:1px solid var(--hawk-border);color:var(--hawk-silver);padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;white-space:nowrap;">
+      ✕ Limpiar
+    </button>
+  </div>
+  <!-- RESUMEN DIA -->
+  <div id="resumenDia" style="display:none;background:rgba(0,200,120,0.07);border:1px solid rgba(0,200,120,0.2);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#4ade80;letter-spacing:1px;"></div>
+
   <div id="historialList">
     <div class="empty-state">
       <div class="empty-icon">📋</div>
@@ -806,7 +825,7 @@
 // ══════════════════════════════════════════════════════
 
 const APP_CONFIG = window.APP_CONFIG || {};
-const GS_URL = APP_CONFIG.GS_URL || 'https://script.google.com/macros/s/AKfycby0J0kzVDsHASiSB1UwIe--I6fwPrsBbCA7_HNYbBxUOqvWi2RXmsK6Z4BkCUKuPaRe/exec';
+const GS_URL = APP_CONFIG.GS_URL || 'https://script.google.com/macros/s/AKfycbwEFl9-buYeIIF4c6u0S-_sTVsaTkBwZxyg7so1VcoVFQBOy3modRh7t2nimxR38O9AdQ/exec';
 const GS_API_KEY = ''; // no requerida
 
 async function apiFetch(action, { method='GET', payload=null } = {}) {
@@ -956,13 +975,19 @@ async function cargarFacturasCloud() {
       })
     })).filter(f => !blacklist.includes(String(f.id))).reverse();
     setSyncStatus('ok');
+    // Limpiar localStorage para evitar datos viejos al próximo inicio
+    localStorage.removeItem('hl_facturas');
     updateFacturaNumFromHistorial();
     renderHistorial();
     renderStats();
   } catch(e) {
     console.error('Error cargarFacturasCloud:', e);
     setSyncStatus('error');
+    // Fallback offline - solo si no hay conexión
     try { facturas = JSON.parse(localStorage.getItem('hl_facturas') || '[]'); } catch(_) { facturas = []; }
+    if (facturas.length > 0) {
+      showToast('⚠ Sin conexión — mostrando datos locales', 'error');
+    }
     updateFacturaNumFromHistorial();
     renderHistorial();
     renderStats();
@@ -1414,14 +1439,46 @@ function enviarWhatsApp() {
 }
 
 // ── HISTORIAL ─────────────────────────────────────────
+function limpiarFiltros() {
+  document.getElementById('filtroFecha').value = '';
+  document.getElementById('filtroEstado').value = '';
+  renderHistorial();
+}
+
 function renderHistorial() {
   const list = document.getElementById('historialList');
-  document.getElementById('histCountBadge').textContent = facturas.length + ' facturas';
-  if (!facturas.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Aquí aparecerán las facturas guardadas</p></div>';
+  const filtroFecha  = (document.getElementById('filtroFecha')  || {}).value || '';
+  const filtroEstado = (document.getElementById('filtroEstado') || {}).value || '';
+
+  // Aplicar filtros
+  let filtered = facturas.slice();
+  if (filtroFecha) {
+    filtered = filtered.filter(f => {
+      const fecha = (f.fecha || '').toString().slice(0,10);
+      return fecha === filtroFecha;
+    });
+  }
+  if (filtroEstado) {
+    filtered = filtered.filter(f => (f.estado||'') === filtroEstado);
+  }
+
+  // Resumen del día filtrado
+  const resumenDiv = document.getElementById('resumenDia');
+  if (filtroFecha && filtered.length > 0) {
+    const totalDia = filtered.reduce((a,f) => a + (parseFloat(f.total)||0), 0);
+    const countDia = filtered.length;
+    resumenDiv.style.display = 'block';
+    resumenDiv.innerHTML = '📅 ' + filtroFecha + ' — ' + countDia + ' venta(s) · Total: <strong>' + fmt(totalDia) + '</strong>';
+  } else {
+    if (resumenDiv) resumenDiv.style.display = 'none';
+  }
+
+  document.getElementById('histCountBadge').textContent = filtered.length + ' de ' + facturas.length + ' facturas';
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><p>' + (filtroFecha||filtroEstado ? 'Sin resultados para ese filtro' : 'Aquí aparecerán las facturas guardadas') + '</p></div>';
     return;
   }
-  list.innerHTML = facturas.map(f => {
+  list.innerHTML = filtered.map(f => {
     const estadoClass = f.estado==='Pagada'?'badge-green': f.estado==='Anulada'?'badge-red':'badge-yellow';
     const itemsStr = f.items.map(i=>i.desc).slice(0,3).join(', ') + (f.items.length>3?'...':'');
     return `<div class="hist-card">
