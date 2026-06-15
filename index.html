@@ -965,11 +965,31 @@ async function cargarFacturasCloud() {
       subtotal:   parseFloat(r.subtotal)||0,
       iva:        parseFloat(r.iva)||0,
       total:      parseFloat(r.total)||0,
-      items:      (r.itemsStr||'').split(' | ').filter(Boolean).map(s => {
-        const m = s.match(/^(.+)x(\d+(?:\.\d+)?)(?:@(.+))?$/);
-        if (m) return {desc: m[1].trim(), qty: parseFloat(m[2])||1, price: parseFloat((m[3]||'0').replace(/[$.,]/g,''))||0, total: 0};
-        return {desc: s, qty: 1, price: 0, total: 0};
-      })
+      items:      (() => {
+        const raw = r.itemsStr || '';
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            return parsed.map(it => {
+              if (typeof it === 'object' && it !== null) {
+                const desc = (it.nombre || it.descripcion || it.desc || '').trim();
+                const qty = parseFloat(it.cantidad || it.qty || 1);
+                const price = parseFloat(it.precio || it.price || 0);
+                return {desc, qty, price, total: qty * price};
+              }
+              const str = String(it);
+              const m2 = str.match(/^(.+)x(\d+(?:\.\d+)?)(?:@(.+))?$/);
+              if (m2) return {desc: m2[1].trim(), qty: parseFloat(m2[2])||1, price: parseFloat((m2[3]||'0').replace(/[$.,]/g,''))||0, total: 0};
+              return {desc: str, qty: 1, price: 0, total: 0};
+            });
+          }
+        } catch(_) {}
+        return raw.split(' | ').filter(Boolean).map(s => {
+          const m = s.match(/^(.+)x(\d+(?:\.\d+)?)(?:@(.+))?$/);
+          if (m) return {desc: m[1].trim(), qty: parseFloat(m[2])||1, price: parseFloat((m[3]||'0').replace(/[$.,]/g,''))||0, total: 0};
+          return {desc: s, qty: 1, price: 0, total: 0};
+        });
+      })()
     })).filter(f => !blacklist.includes(String(f.id))).reverse();
     setSyncStatus('ok');
     // Limpiar localStorage para evitar datos viejos al próximo inicio
@@ -1029,7 +1049,7 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
 async function anularFacturaCloud(id) {
   try {
     await apiFetch('anularFactura', {
-      method: 'POST',
+      method: 'GET',
       payload: { id: String(id) }
     });
     return true;
@@ -1482,7 +1502,7 @@ function renderHistorial() {
       <div class="hist-top">
         <div>
           <div class="hist-num">${f.factura}</div>
-          <div class="hist-date">${f.fecha}</div>
+          <div class="hist-date">${(f.fecha||"").toString().slice(0,10).split("-").reverse().join("/")}</div>
         </div>
         <span class="badge ${estadoClass}">${f.estado}</span>
       </div>
