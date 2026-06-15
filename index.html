@@ -832,18 +832,15 @@ async function apiFetch(action, { method='GET', payload=null } = {}) {
   if (!GS_URL) throw new Error('GS_URL no configurada');
 
   try {
-    const isGet = method.toUpperCase() === 'GET';
-    const query = `action=${encodeURIComponent(action)}`;
-    const url = isGet
-      ? `${GS_URL}${GS_URL.includes('?') ? '&' : '?'}${query}`
-      : GS_URL;
-
-    const options = { method };
-
-    if (!isGet && payload) {
-      options.headers = { 'Content-Type': 'text/plain' };
-      options.body = JSON.stringify({ action, ...(payload || {}) });
+    // Siempre usar GET con todos los parámetros en la URL (evita CORS con POST)
+    const params = new URLSearchParams({ accion: action });
+    if (payload) {
+      Object.entries(payload).forEach(([k, v]) => {
+        if (v !== null && v !== undefined) params.set(k, String(v));
+      });
     }
+    const url = GS_URL + '?' + params.toString();
+    const options = { method: 'GET' };
 
     const res = await fetch(url, options);
     const text = await res.text();
@@ -1009,7 +1006,7 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
       subtotal:     venta.subtotal,
       iva:          venta.iva,
       total:        venta.total,
-      itemsStr:     venta.items.map(i => i.desc + 'x' + i.qty + '@' + i.price).join(' | '),
+      itemsStr:     JSON.stringify(venta.items.map(i => ({ nombre: i.desc, cantidad: i.qty, precio: i.price, descuento: i.descuento||0 }))),
       notas:        venta.notas,
       stockUpdates: stockUpdates
     };
