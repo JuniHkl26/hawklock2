@@ -797,6 +797,19 @@
         • Devuelve el stock de los productos<br>
         • El registro queda guardado en el historial
       </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#7a90a6;display:block;margin-bottom:8px">Motivo de anulación</label>
+        <select id="anularMotivo" style="width:100%;background:#0a0f1a;border:1px solid #1a2535;border-radius:8px;color:#c8d4e0;padding:10px 12px;font-size:13px;outline:none">
+          <option value="">Selecciona un motivo...</option>
+          <option value="Error en factura">Error en factura</option>
+          <option value="Devolución de producto">Devolución de producto</option>
+          <option value="Producto defectuoso">Producto defectuoso</option>
+          <option value="Pedido cancelado">Pedido cancelado</option>
+          <option value="Duplicado">Duplicado</option>
+          <option value="Otro">Otro</option>
+        </select>
+        <textarea id="anularMotivoExtra" placeholder="Detalles adicionales (opcional)..." style="width:100%;background:#0a0f1a;border:1px solid #1a2535;border-radius:8px;color:#c8d4e0;padding:10px 12px;font-size:12px;margin-top:8px;resize:vertical;min-height:60px;outline:none;font-family:inherit;box-sizing:border-box"></textarea>
+      </div>
       <div id="anularItemsList" style="background:rgba(255,255,255,0.03);border:1px solid #1a2535;border-radius:10px;padding:14px;margin-bottom:20px;font-size:13px;color:#c8d4e0;line-height:2"></div>
       <div id="anularResultado" style="display:none;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:16px"></div>
       <div style="display:flex;flex-direction:column;gap:10px">
@@ -1046,11 +1059,11 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
   }
 }
 
-async function anularFacturaCloud(id) {
+async function anularFacturaCloud(id, motivo='') {
   try {
     await apiFetch('anularFactura', {
       method: 'GET',
-      payload: { id: String(id) }
+      payload: { id: String(id), motivo: motivo }
     });
     return true;
   } catch(e) {
@@ -1597,6 +1610,13 @@ function cerrarAnularModal() {
 function confirmarAnulacion() {
   const f = facturas.find(x => x.id === _anularId);
   if (!f) return;
+  const motivo = document.getElementById('anularMotivo')?.value || '';
+  const motivoExtra = document.getElementById('anularMotivoExtra')?.value || '';
+  if (!motivo) {
+    showToast('⚠ Selecciona un motivo de anulación', 'error');
+    return;
+  }
+  f.motivoAnulacion = motivo + (motivoExtra ? ' — ' + motivoExtra : '');
 
   // Restore stock in memory
   const restaurados = [];
@@ -1611,7 +1631,7 @@ function confirmarAnulacion() {
   // Mark as anulada locally and in cloud
   f.estado = 'Anulada';
   saveFacturas();
-  anularFacturaCloud(f.id); // async, no blocker
+  anularFacturaCloud(f.id, f.motivoAnulacion); // async, no blocker
   renderHistorial();
   renderStats();
 
@@ -1621,7 +1641,7 @@ function confirmarAnulacion() {
 
   const el = document.getElementById('anularResultado');
   el.style.display = 'block';
-  el.innerHTML = `✅ Factura <strong>${f.factura}</strong> anulada.<br>Stock restaurado: ${restaurados.length ? restaurados.join(', ') : 'ninguno'}`;
+  el.innerHTML = `✅ Factura <strong>${f.factura}</strong> anulada.<br>Stock restaurado: ${restaurados.length ? restaurados.join(', ') : 'ninguno'}<br>Motivo: <em>${f.motivoAnulacion||''}</em>`;
   el.style.background = 'rgba(34,197,94,0.1)';
   el.style.border = '1px solid #22c55e';
   el.style.color = '#4ade80';
