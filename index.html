@@ -2045,7 +2045,7 @@ async function cargarGastosCloud() {
       const costoU   = parseFloat(g.costoUnit) || 0;
       const ivaG     = parseFloat(g.iva)       || 0;
       const totalG   = parseFloat(g.total)     || (cant * costoU + ivaG);
-      const pendiente = parseFloat(g.pendiente) || 0;
+      const pendiente = (g.estado === 'Pagado') ? 0 : (parseFloat(g.total) || 0);
       return '<div class="hist-card">' +
         '<div class="hist-top">' +
           '<div><div class="hist-num">' + g.factura + '</div><div class="hist-date">' + g.fecha + '</div></div>' +
