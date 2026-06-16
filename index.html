@@ -572,6 +572,11 @@
   <!-- RESUMEN DIA -->
   <div id="resumenDia" style="display:none;background:rgba(0,200,120,0.07);border:1px solid rgba(0,200,120,0.2);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#4ade80;letter-spacing:1px;"></div>
 
+  <button id="btnCerrarDia" onclick="cerrarDiaManual()"
+    style="width:100%;margin-bottom:12px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.4);color:#f59e0b;padding:10px 16px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+    🔒 Cerrar Día
+  </button>
+
   <div id="historialList">
     <div class="empty-state">
       <div class="empty-icon">📋</div>
@@ -2083,6 +2088,32 @@ function cambiarContrasenaUrl() {
   if (!nueva || nueva.length < 8) { alert('Mínimo 8 caracteres'); return; }
   localStorage.setItem('hl_url_pass', nueva);
   alert('✅ Contraseña de acceso actualizada');
+}
+
+// ── CERRAR DÍA MANUAL ────────────────────────────────
+async function cerrarDiaManual() {
+  const btn = document.getElementById('btnCerrarDia');
+  const fecha = document.getElementById('filtroFecha').value || new Date().toISOString().split('T')[0];
+
+  if (!confirm('¿Cerrar el día ' + fecha + '? Esto guardará el resumen en la pestaña Cierres.')) return;
+
+  btn.textContent = '⏳ Cerrando...';
+  btn.disabled = true;
+
+  try {
+    const data = await apiFetch('cerrarDia', { fecha });
+    if (data.ok) {
+      const msg = data.actualizado ? '🔄 Cierre actualizado' : '✅ Día cerrado';
+      showToast(msg + ' — ' + data.numFacturas + ' facturas · $' + fmt(data.totalVendido), 'success');
+    } else {
+      showToast('⚠ ' + (data.msg || 'No se pudo cerrar'), 'error');
+    }
+  } catch(e) {
+    showToast('⚠ Error de conexión', 'error');
+  } finally {
+    btn.textContent = '🔒 Cerrar Día';
+    btn.disabled = false;
+  }
 }
 
 // ── START ─────────────────────────────────────────────
