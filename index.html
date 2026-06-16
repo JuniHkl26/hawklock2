@@ -922,7 +922,13 @@ function showPage(name, btn) {
   document.getElementById('page-' + name).classList.add('active');
   btn.classList.add('active');
   if (name === 'inventario') renderInventario();
-  if (name === 'historial')  { renderHistorial(); renderStats(); }
+  if (name === 'historial') {
+    // Poner filtro en hoy por defecto
+    const hoyStr = new Date().toISOString().split('T')[0];
+    const filtroEl = document.getElementById('filtroFecha');
+    if (filtroEl && !filtroEl.value) filtroEl.value = hoyStr;
+    renderHistorial(); renderStats();
+  }
   if (name === 'gastos')     { cargarGastosCloud(); document.getElementById('gastoFecha').valueAsDate = new Date(); }
   if (name === 'config')     renderStats();
 }
@@ -1145,15 +1151,15 @@ function detectVentasCount() {
 }
 
 function updateFacturaNumFromHistorial() {
-  if (!facturas.length) return;
+  const hoy = new Date().toISOString().split('T')[0];
+  // Solo contar facturas de HOY para el número del día
+  const facturasHoy = facturas.filter(f => (f.fecha||'').toString().slice(0,10) === hoy && f.estado !== 'Anulada');
   let maxNum = 0;
-  facturas.forEach(f => {
+  facturasHoy.forEach(f => {
     const m = String(f.factura||'').match(/(\d+)$/);
     if (m) { const n = parseInt(m[1]); if (n > maxNum) maxNum = n; }
   });
-  if (maxNum > 0) {
-    document.getElementById('facturaNum').value = 'FAC-' + String(maxNum + 1).padStart(4, '0');
-  }
+  document.getElementById('facturaNum').value = 'FAC-' + String(maxNum + 1).padStart(4, '0');
 }
 
 function updateInvBadge() {
@@ -1498,12 +1504,17 @@ function renderHistorial() {
     const totalDia = filtered.reduce((a,f) => a + (parseFloat(f.total)||0), 0);
     const countDia = filtered.length;
     resumenDiv.style.display = 'block';
-    resumenDiv.innerHTML = '📅 ' + filtroFecha + ' — ' + countDia + ' venta(s) · Total: <strong>' + fmt(totalDia) + '</strong>';
+    const totalAnuladas = filtered.filter(f => f.estado === 'Anulada').length;
+    const totalPagadas = filtered.filter(f => f.estado === 'Pagada').length;
+    const totalPendientes = filtered.filter(f => f.estado !== 'Pagada' && f.estado !== 'Anulada').length;
+    resumenDiv.innerHTML = '📅 ' + filtroFecha.split('-').reverse().join('/') + ' — <strong>' + fmt(totalDia) + '</strong> · ' + countDia + ' factura(s) · ✅ ' + totalPagadas + ' pagadas · 🔴 ' + totalAnuladas + ' anuladas' + (totalPendientes ? ' · ⏳ ' + totalPendientes + ' pendientes' : '');
   } else {
     if (resumenDiv) resumenDiv.style.display = 'none';
   }
 
-  document.getElementById('histCountBadge').textContent = filtered.length + ' de ' + facturas.length + ' facturas';
+  const hoyBadge = new Date().toISOString().split('T')[0];
+  const factHoy = facturas.filter(f => (f.fecha||'').toString().slice(0,10) === hoyBadge).length;
+  document.getElementById('histCountBadge').textContent = factHoy + ' factura(s) hoy';
   if (!filtered.length) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><p>' + (filtroFecha||filtroEstado ? 'Sin resultados para ese filtro' : 'Aquí aparecerán las facturas guardadas') + '</p></div>';
     return;
