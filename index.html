@@ -2102,7 +2102,7 @@ async function cerrarDiaManual() {
   btn.disabled = true;
 
   try {
-    const data = await apiFetch('cerrarDia', { fecha });
+    const data = await apiFetch('cerrarDia', { payload: { fecha } });
     if (data.ok) {
       const msg = data.actualizado ? '🔄 Cierre actualizado' : '✅ Día cerrado';
       showToast(msg + ' — ' + data.numFacturas + ' facturas · $' + fmt(data.totalVendido), 'success');
