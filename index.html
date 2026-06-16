@@ -1974,6 +1974,8 @@ async function guardarGasto() {
   const costo = parseFloat(document.getElementById('gastoCosto').value)||0;
   const iva   = parseFloat(document.getElementById('gastoIva').value)||0;
   const abono = parseFloat(document.getElementById('gastoAbono').value)||0;
+  const subtotal = cant * costo;
+  const total = subtotal + iva;
 
   const payload = {
     fecha:      document.getElementById('gastoFecha').value || new Date().toISOString().split('T')[0],
@@ -1981,8 +1983,10 @@ async function guardarGasto() {
     producto,
     categoria:  document.getElementById('gastoCategoria').value,
     cantidad:   cant,
-    costoUnit:  costo,
+    costo:      costo,
+    subtotal:   subtotal,
     iva,
+    total:      total,
     abono,
     estado:     document.getElementById('gastoEstado').value,
     pendiente:  parseFloat(document.getElementById('gastoPendiente').value)||0
@@ -2045,7 +2049,7 @@ async function cargarGastosCloud() {
       const costoU   = parseFloat(g.costoUnit) || 0;
       const ivaG     = parseFloat(g.iva)       || 0;
       const totalG   = parseFloat(g.total)     || (cant * costoU + ivaG);
-      const pendiente = (g.estado === 'Pagado') ? 0 : (parseFloat(g.total) || 0);
+      const pendiente = (g.estado === 'Pagado') ? 0 : (parseFloat(g.pendiente) || parseFloat(g.total) || 0);
       return '<div class="hist-card">' +
         '<div class="hist-top">' +
           '<div><div class="hist-num">' + g.factura + '</div><div class="hist-date">' + g.fecha + '</div></div>' +
