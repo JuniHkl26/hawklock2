@@ -293,8 +293,38 @@
 
 
 
+  /* ── ROTULO ENVÍO ── */
+  .rot-header { background:linear-gradient(135deg,#080c10 0%,#0d1a2e 100%); padding:20px 24px; display:flex; justify-content:space-between; align-items:center; }
+  .rot-header h1 { font-family:'Rajdhani',sans-serif; font-size:24px; font-weight:700; color:#fff; letter-spacing:3px; }
+  .rot-header .sub { color:#7a90a6; font-size:10px; letter-spacing:2px; text-transform:uppercase; margin-top:2px; }
+  .rot-stripe { height:5px; background:linear-gradient(90deg,#1d72e8,#3d9bff,#1558c0); }
+  .rot-body { padding:20px 24px; }
+  .rot-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
+  .rot-box { background:#f8fafc; border:2px solid #111; border-radius:8px; padding:14px 16px; }
+  .rot-box.dest { border-color:#1d72e8; background:#eff6ff; }
+  .rot-label { font-size:10px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:#1d72e8; margin-bottom:8px; }
+  .rot-name { font-size:17px; font-weight:700; color:#111; margin-bottom:6px; line-height:1.3; }
+  .rot-line { font-size:13px; color:#333; line-height:1.7; }
+  .rot-line strong { color:#000; }
+  .rot-meta-row { display:flex; gap:10px; margin-bottom:16px; }
+  .rot-meta-box { flex:1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; text-align:center; }
+  .rot-meta-label { font-size:9px; color:#888; letter-spacing:1px; text-transform:uppercase; margin-bottom:3px; }
+  .rot-meta-value { font-size:15px; font-weight:700; color:#111; }
+  .rot-footer { display:flex; justify-content:space-between; align-items:center; padding-top:14px; border-top:1px solid #eef0f3; }
+  .rot-footer-text { font-size:9px; color:#aaa; }
+  .rot-badge { background:#f0f9ff; border:1px solid #bae6fd; color:#1d72e8; font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; padding:4px 10px; border-radius:4px; }
+  .rot-guide { font-size:18px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:2px; color:#111; text-align:center; padding:10px; background:#fffbeb; border:1px dashed #f59e0b; border-radius:8px; margin-bottom:16px; }
+
+  @media print {
+    body { background:#fff; padding:0; }
+    .topbar, .panel, #toast, .tab-bar { display:none !important; }
+    #rotuloModal { position:static; background:none; padding:0; display:block !important; }
+    #rotuloModal > div { box-shadow:none; }
+    #rotuloModal > div > div:last-child { display:none !important; }
+    .page { padding:0 !important; }
+  }
+
   /* ── URL PASSWORD SCREEN ── */
-  #urlPassScreen {
     position: fixed; inset: 0; background: #020408;
     z-index: 99999; display: flex; flex-direction: column;
     align-items: center; justify-content: center; padding: 40px 24px;
@@ -671,6 +701,104 @@
   </div>
 </div>
 
+<!-- ══════════════ ROTULO ENVÍO PAGE ══════════════ -->
+<div class="page" id="page-rotulo">
+  <div class="topbar">
+    <div class="topbar-title">Rótulo de Envío</div>
+    <div class="topbar-badge">Hawk Lock</div>
+  </div>
+
+  <div class="section-title">Buscar factura</div>
+  <div class="panel">
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>N° de Factura</label>
+        <input type="text" id="rotBuscarFactura" placeholder="Ej: FAC-0001 o WOMPI-1234" autocomplete="off">
+      </div>
+    </div>
+    <button class="btn btn-add" style="margin-top:12px" onclick="rotBuscarYCargar()">🔍 Buscar y cargar datos</button>
+  </div>
+
+  <div class="section-title">Remitente (fijo)</div>
+  <div class="panel">
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Nombre / Empresa</label>
+        <input type="text" id="rotRemNombre" value="Hawk Lock">
+      </div>
+      <div class="form-group">
+        <label>Teléfono</label>
+        <input type="text" id="rotRemTel" value="3126332199">
+      </div>
+      <div class="form-group">
+        <label>NIT/RUT</label>
+        <input type="text" id="rotRemNit" value="1027520164">
+      </div>
+      <div class="form-group full">
+        <label>Ciudad de origen</label>
+        <input type="text" id="rotRemCiudad" value="Bogotá D.C.">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Destinatario</div>
+  <div class="panel">
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Nombre completo *</label>
+        <input type="text" id="rotDestNombre" placeholder="Nombre del cliente">
+      </div>
+      <div class="form-group full">
+        <label>Dirección *</label>
+        <input type="text" id="rotDestDir" placeholder="Calle, número, barrio">
+      </div>
+      <div class="form-group">
+        <label>Ciudad *</label>
+        <input type="text" id="rotDestCiudad" placeholder="Ciudad">
+      </div>
+      <div class="form-group">
+        <label>Teléfono *</label>
+        <input type="text" id="rotDestTel" placeholder="3XX XXX XXXX">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Datos del envío</div>
+  <div class="panel">
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Contenido</label>
+        <input type="text" id="rotEnvContenido" value="Bloqueador vehicular electrónico">
+      </div>
+      <div class="form-group">
+        <label>N° Factura / Referencia</label>
+        <input type="text" id="rotEnvFactura" placeholder="FAC-0001">
+      </div>
+      <div class="form-group">
+        <label>Valor declarado ($)</label>
+        <input type="number" id="rotEnvValor" placeholder="180000">
+      </div>
+      <div class="form-group">
+        <label>Peso (kg)</label>
+        <input type="number" id="rotEnvPeso" value="1" step="0.1">
+      </div>
+      <div class="form-group">
+        <label>Piezas</label>
+        <input type="number" id="rotEnvPiezas" value="1" min="1">
+      </div>
+      <div class="form-group full">
+        <label>Transportadora</label>
+        <select id="rotEnvTransportadora">
+          <option>Interrapidísimo</option>
+          <option>Envía</option>
+          <option>Servientrega</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-success" style="margin-top:14px" onclick="generarRotulo()">🏷️ Generar rótulo</button>
+  </div>
+</div>
+
 <!-- ══════════════ TAB BAR ══════════════ -->
 
 <!-- ══════════════ GASTOS PAGE ══════════════ -->
@@ -767,6 +895,10 @@
     <span class="tab-icon">💸</span>
     <span>Gastos</span>
   </button>
+  <button class="tab-btn" onclick="showPage('rotulo', this)">
+    <span class="tab-icon">🏷️</span>
+    <span>Rótulo</span>
+  </button>
   <button class="tab-btn" onclick="showPage('config', this)">
     <span class="tab-icon">⚙️</span>
     <span>Config</span>
@@ -827,6 +959,17 @@
           Cancelar
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RÓTULO ENVÍO -->
+<div id="rotuloModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:1000;overflow:auto;padding:16px;padding-top:calc(16px + var(--safe-top));backdrop-filter:blur(6px)">
+  <div style="background:#fff;color:#111;border-radius:12px;overflow:hidden;max-width:600px;margin:0 auto;animation:modalIn 0.3s cubic-bezier(.16,1,.3,1)">
+    <div id="rotuloHTML"></div>
+    <div style="background:#f8fafc;padding:14px 20px;display:flex;justify-content:space-between;gap:10px;border-top:1px solid #e2e8f0">
+      <button onclick="cerrarRotuloModal()" style="font-family:'Barlow Condensed',sans-serif;background:none;border:1px solid #ccc;color:#555;font-size:12px;font-weight:700;letter-spacing:1px;padding:9px 16px;border-radius:8px;cursor:pointer;text-transform:uppercase">✕ Cerrar</button>
+      <button onclick="window.print()" style="font-family:'Barlow Condensed',sans-serif;background:linear-gradient(135deg,#1d72e8,#1558c0);color:#fff;border:none;font-size:12px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:8px;cursor:pointer;text-transform:uppercase">🖨 Imprimir rótulo</button>
     </div>
   </div>
 </div>
@@ -2115,6 +2258,122 @@ async function cerrarDiaManual() {
     btn.textContent = '🔒 Cerrar Día';
     btn.disabled = false;
   }
+}
+
+// ── ROTULO DE ENVÍO ──────────────────────────────────
+async function rotBuscarYCargar() {
+  const num = document.getElementById('rotBuscarFactura').value.trim();
+  if (!num) { showToast('⚠ Escribe un número de factura', 'error'); return; }
+
+  showToast('⏳ Buscando factura...', 'info');
+  try {
+    const data = await apiFetch('getFacturas');
+    if (!data.facturas) { showToast('⚠ No se pudo conectar', 'error'); return; }
+
+    const factura = data.facturas.find(f => String(f.factura).toUpperCase() === num.toUpperCase() || String(f.id).toUpperCase() === num.toUpperCase());
+
+    if (!factura) { showToast('⚠ Factura no encontrada', 'error'); return; }
+
+    document.getElementById('rotDestNombre').value = factura.cliente || '';
+    document.getElementById('rotDestTel').value = factura.clienteTel || '';
+    document.getElementById('rotDestDir').value = factura.clienteDir || '';
+    document.getElementById('rotEnvFactura').value = factura.factura || num;
+    document.getElementById('rotEnvValor').value = factura.total || '';
+
+    let itemsTexto = 'Bloqueador vehicular electrónico';
+    try {
+      const items = JSON.parse(factura.itemsStr || '[]');
+      if (items.length) itemsTexto = items.join(', ');
+    } catch(e) {}
+    document.getElementById('rotEnvContenido').value = itemsTexto;
+
+    showToast('✅ Datos cargados de ' + factura.factura, 'success');
+  } catch(e) {
+    showToast('⚠ Error de conexión', 'error');
+  }
+}
+
+function generarRotulo() {
+  const destNombre = document.getElementById('rotDestNombre').value.trim();
+  const destDir = document.getElementById('rotDestDir').value.trim();
+  const destCiudad = document.getElementById('rotDestCiudad').value.trim();
+  const destTel = document.getElementById('rotDestTel').value.trim();
+
+  if (!destNombre || !destDir || !destCiudad || !destTel) {
+    showToast('⚠ Completa todos los campos del destinatario', 'error');
+    return;
+  }
+
+  const remNombre = document.getElementById('rotRemNombre').value;
+  const remTel = document.getElementById('rotRemTel').value;
+  const remNit = document.getElementById('rotRemNit').value;
+  const remCiudad = document.getElementById('rotRemCiudad').value;
+
+  const envContenido = document.getElementById('rotEnvContenido').value;
+  const envFactura = document.getElementById('rotEnvFactura').value || 'S/N';
+  const envValor = document.getElementById('rotEnvValor').value;
+  const envPeso = document.getElementById('rotEnvPeso').value;
+  const envPiezas = document.getElementById('rotEnvPiezas').value;
+  const envTransportadora = document.getElementById('rotEnvTransportadora').value;
+
+  const html = `
+    <div class="rot-header">
+      <div>
+        <h1>🦅 HAWK LOCK</h1>
+        <div class="sub">Rótulo de envío</div>
+      </div>
+      <div class="rot-badge">${envTransportadora}</div>
+    </div>
+    <div class="rot-stripe"></div>
+    <div class="rot-body">
+      <div class="rot-guide">REF: ${envFactura}</div>
+      <div class="rot-grid">
+        <div class="rot-box">
+          <div class="rot-label">Remitente</div>
+          <div class="rot-name">${remNombre}</div>
+          <div class="rot-line">${remCiudad}</div>
+          <div class="rot-line"><strong>Tel:</strong> ${remTel}</div>
+          <div class="rot-line"><strong>NIT:</strong> ${remNit}</div>
+        </div>
+        <div class="rot-box dest">
+          <div class="rot-label">Destinatario</div>
+          <div class="rot-name">${destNombre}</div>
+          <div class="rot-line">${destDir}</div>
+          <div class="rot-line">${destCiudad}</div>
+          <div class="rot-line"><strong>Tel:</strong> ${destTel}</div>
+        </div>
+      </div>
+      <div class="rot-meta-row">
+        <div class="rot-meta-box">
+          <div class="rot-meta-label">Peso</div>
+          <div class="rot-meta-value">${envPeso} kg</div>
+        </div>
+        <div class="rot-meta-box">
+          <div class="rot-meta-label">Piezas</div>
+          <div class="rot-meta-value">${envPiezas}</div>
+        </div>
+        <div class="rot-meta-box">
+          <div class="rot-meta-label">Valor declarado</div>
+          <div class="rot-meta-value">${fmt(envValor)}</div>
+        </div>
+      </div>
+      <div class="rot-box" style="margin-bottom:16px">
+        <div class="rot-label">Contenido</div>
+        <div class="rot-line">${envContenido}</div>
+      </div>
+      <div class="rot-footer">
+        <div class="rot-footer-text">Generado por Hawk Lock — Sistema de Facturación</div>
+        <div class="rot-footer-text">${new Date().toLocaleDateString('es-CO')}</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('rotuloHTML').innerHTML = html;
+  document.getElementById('rotuloModal').style.display = 'block';
+}
+
+function cerrarRotuloModal() {
+  document.getElementById('rotuloModal').style.display = 'none';
 }
 
 // ── START ─────────────────────────────────────────────
