@@ -511,6 +511,10 @@
         <label>Dirección</label>
         <input type="text" id="clienteDir" placeholder="Dirección del cliente">
       </div>
+      <div class="form-group full">
+        <label>Correo electrónico</label>
+        <input type="email" id="clienteEmail" placeholder="cliente@correo.com">
+      </div>
     </div>
   </div>
 
@@ -1159,6 +1163,7 @@ async function cargarFacturasCloud() {
       clienteId:  r.clienteId,
       clienteTel: r.clienteTel,
       clienteDir: r.clienteDir,
+      clienteEmail: r.clienteEmail,
       estado:     r.estado,
       notas:      r.notas,
       abono:      parseFloat(r.abono)||0,
@@ -1224,6 +1229,7 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
       clienteId:    venta.clienteId,
       clienteTel:   venta.clienteTel,
       clienteDir:   venta.clienteDir,
+      clienteEmail: venta.clienteEmail,
       estado:       venta.estado,
       subtotal:     venta.subtotal,
       iva:          venta.iva,
@@ -1603,6 +1609,7 @@ async function guardarVenta() {
     clienteId:  document.getElementById('clienteId').value,
     clienteTel: document.getElementById('clienteTel').value,
     clienteDir: document.getElementById('clienteDir').value,
+    clienteEmail: document.getElementById('clienteEmail').value,
     estado:     document.getElementById('estado').value,
     notas:      document.getElementById('notas').value,
     vendedor:   usuarioActual ? usuarioActual.nombre : 'Admin',
@@ -2350,6 +2357,7 @@ async function rotBuscarYCargar() {
     document.getElementById('rotDestNombre').value = factura.cliente || '';
     document.getElementById('rotDestTel').value = factura.clienteTel || '';
     document.getElementById('rotDestDir').value = factura.clienteDir || '';
+    document.getElementById('rotDestEmail').value = factura.clienteEmail || '';
     document.getElementById('rotEnvFactura').value = factura.factura || num;
     document.getElementById('rotEnvValor').value = factura.total || '';
 
@@ -2443,10 +2451,6 @@ function generarRotulo() {
           <div class="rot-meta-label">Piezas</div>
           <div class="rot-meta-value">${envPiezas}</div>
         </div>
-        <div class="rot-meta-box">
-          <div class="rot-meta-label">Valor declarado</div>
-          <div class="rot-meta-value">${fmt(envValor)}</div>
-        </div>
       </div>
       <div class="rot-box" style="margin-bottom:16px">
         <div class="rot-label">Contenido</div>
@@ -2478,7 +2482,7 @@ async function completarPagoVenta(id) {
   try {
     setSyncStatus('syncing');
     const resp = await apiFetch('actualizarEstadoFactura', {
-      payload: { id: String(f.id), estado: 'Pagada', pendiente: 0 }
+      payload: { id: String(f.factura), estado: 'Pagada', pendiente: 0 }
     });
     if (resp && resp.ok && resp.actualizadas > 0) {
       f.estado = 'Pagada';
