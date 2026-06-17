@@ -520,11 +520,16 @@
 
     <div class="form-group" style="margin-bottom:12px">
       <label>Estado</label>
-      <select id="estado">
+      <select id="estado" onchange="toggleAbonoVenta()">
         <option>Pagada</option>
+        <option>Abono</option>
         <option>Pendiente de pago</option>
         <option>Anulada</option>
       </select>
+    </div>
+    <div class="form-group" id="abonoVentaGroup" style="margin-bottom:12px;display:none">
+      <label>Valor abonado ($)</label>
+      <input type="number" id="abonoVenta" value="0" min="0" step="1000" inputmode="numeric">
     </div>
     <div class="form-group" style="margin-bottom:12px">
       <label>Vendedor</label>
@@ -1196,6 +1201,9 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
       total:        venta.total,
       itemsStr:     JSON.stringify(venta.items.map(i => ({ nombre: i.desc, cantidad: i.qty, precio: i.price, descuento: i.descuento||0 }))),
       notas:        venta.notas,
+      vendedor:     venta.vendedor,
+      abono:        venta.abono||0,
+      pendiente:    venta.pendiente||0,
       stockUpdates: stockUpdates
     };
     await apiFetch('guardarFactura', {
@@ -1546,6 +1554,13 @@ async function guardarVenta() {
     }
   });
 
+  const abonoVal = (document.getElementById('estado').value === 'Abono')
+    ? (parseFloat(document.getElementById('abonoVenta').value) || 0)
+    : 0;
+  const pendienteVal = (document.getElementById('estado').value === 'Abono')
+    ? Math.max(0, total - abonoVal)
+    : 0;
+
   const venta = {
     id:         Date.now(),
     factura:    facturaNum,
@@ -1561,7 +1576,9 @@ async function guardarVenta() {
     items,
     subtotal:   sub,
     iva,
-    total
+    total,
+    abono:      abonoVal,
+    pendiente:  pendienteVal
   };
 
   facturas.unshift(venta);
@@ -1669,8 +1686,9 @@ function renderHistorial() {
     return;
   }
   list.innerHTML = filtered.map(f => {
-    const estadoClass = f.estado==='Pagada'?'badge-green': f.estado==='Anulada'?'badge-red':'badge-yellow';
+    const estadoClass = f.estado==='Pagada'?'badge-green': f.estado==='Anulada'?'badge-red': f.estado==='Abono'?'badge-yellow':'badge-yellow';
     const itemsStr = f.items.map(i=>i.desc).slice(0,3).join(', ') + (f.items.length>3?'...':'');
+    const pendienteVenta = (f.estado === 'Abono') ? (parseFloat(f.pendiente)||0) : 0;
     return `<div class="hist-card">
       <div class="hist-top">
         <div>
@@ -1681,9 +1699,14 @@ function renderHistorial() {
       </div>
       <div class="hist-cliente">👤 ${f.cliente}</div>
       <div class="hist-total">${fmt(f.total)}</div>
+      ${pendienteVenta > 0 ? `<div style="font-size:11px;color:#f59e0b;letter-spacing:1px;margin-top:2px">⚠ Pendiente: ${fmt(pendienteVenta)}</div>` : ''}
       <div class="hist-items">${itemsStr}</div>
       <div class="hist-btn-row">
         <button class="hist-btn hist-btn-view" onclick="verFactura(${f.id})">👁 Ver</button>
+        ${f.estado === 'Abono'
+          ? `<button class="hist-btn" style="background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.3);color:#22c55e" onclick="completarPagoVenta(${f.id})">✅ Completar pago</button>`
+          : ''
+        }
         ${f.estado === 'Anulada'
           ? `<button class="hist-btn hist-btn-del" onclick="eliminarFactura(${f.id})">🗑 Eliminar</button>`
           : `<button class="hist-btn hist-btn-anular" onclick="abrirAnularFactura(${f.id})">🚫 Anular</button>`
@@ -2379,6 +2402,38 @@ function generarRotulo() {
 
 function cerrarRotuloModal() {
   document.getElementById('rotuloModal').style.display = 'none';
+}
+
+async function completarPagoVenta(id) {
+  const f = facturas.find(x => x.id === id);
+  if (!f) return;
+  if (!confirm('¿Confirmar que ' + f.factura + ' fue pagada en su totalidad?')) return;
+
+  f.estado = 'Pagada';
+  f.pendiente = 0;
+
+  try {
+    setSyncStatus('syncing');
+    await apiFetch('actualizarEstadoFactura', {
+      method: 'POST',
+      payload: { id: String(f.id), estado: 'Pagada', pendiente: 0 }
+    });
+    setSyncStatus('ok');
+    showToast('✅ ' + f.factura + ' marcada como pagada', 'success');
+  } catch(e) {
+    console.error('Error completando pago:', e);
+    setSyncStatus('error');
+    showToast('⚠ Error al actualizar — reintenta', 'error');
+  }
+  localStorage.setItem('hl_facturas', JSON.stringify(facturas));
+  renderHistorial();
+  renderStats();
+}
+
+function toggleAbonoVenta() {
+  const estado = document.getElementById('estado').value;
+  const group = document.getElementById('abonoVentaGroup');
+  group.style.display = (estado === 'Abono') ? 'block' : 'none';
 }
 
 // ── START ─────────────────────────────────────────────
