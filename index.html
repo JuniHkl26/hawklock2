@@ -2046,7 +2046,7 @@ async function cargarGastosCloud() {
       const estadoClass = g.estado==='Pagado'?'badge-green': g.estado==='Abono'?'badge-yellow':'badge-red';
       // Calcular total correctamente desde los campos disponibles
       const cant     = parseFloat(g.cantidad)  || 1;
-      const costoU   = parseFloat(g.costoUnit) || 0;
+      const costoU   = parseFloat(g.costo) || 0;
       const ivaG     = parseFloat(g.iva)       || 0;
       const totalG   = parseFloat(g.total)     || (cant * costoU + ivaG);
       const pendiente = (g.estado === 'Pagado') ? 0 : (parseFloat(g.pendiente) || parseFloat(g.total) || 0);
