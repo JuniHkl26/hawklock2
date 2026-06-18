@@ -1856,7 +1856,7 @@ function cerrarAnularModal() {
 }
 
 function confirmarAnulacion() {
-  const f = facturas.find(x => x.id === _anularId);
+  const f = facturas.find(x => String(x.id) === String(_anularId));
   if (!f) return;
   const motivo = document.getElementById('anularMotivo')?.value || '';
   const motivoExtra = document.getElementById('anularMotivoExtra')?.value || '';
