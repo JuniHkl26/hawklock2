@@ -261,6 +261,23 @@
   .hist-num { font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:700; color:var(--hawk-blue-light); letter-spacing:1px; }
   .hist-date { font-size:11px; color:var(--hawk-silver-dim); }
   .hist-cliente { font-size:13px; color:var(--hawk-white); margin-bottom:4px; }
+  /* ── TIPO CLIENTE TOGGLE ── */
+  .tipo-toggle { display:flex; gap:0; margin-bottom:14px; border-radius:10px; overflow:hidden; border:1.5px solid rgba(29,114,232,0.3); }
+  .tipo-btn { flex:1; padding:9px 0; font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:13px; letter-spacing:1px; text-transform:uppercase; border:none; background:transparent; color:var(--hawk-muted); cursor:pointer; transition:all .2s; }
+  .tipo-btn.active-final { background:rgba(29,114,232,0.18); color:var(--hawk-blue-light); }
+  .tipo-btn.active-dist  { background:rgba(255,180,0,0.18); color:#ffb400; }
+  .tipo-badge { display:inline-block; font-size:10px; padding:2px 7px; border-radius:20px; margin-left:6px; vertical-align:middle; }
+  .badge-final { background:rgba(29,114,232,0.2); color:var(--hawk-blue-light); }
+  .badge-dist  { background:rgba(255,180,0,0.2); color:#ffb400; }
+  .precio-dist-tag { font-size:11px; color:#ffb400; margin-left:4px; }
+  /* ── CLIENT AUTOCOMPLETE ── */
+  .cliente-search-wrap { position:relative; }
+  .cliente-dropdown { position:absolute; top:100%; left:0; right:0; background:#1a2035; border:1px solid rgba(29,114,232,0.4); border-radius:8px; z-index:200; max-height:180px; overflow-y:auto; display:none; }
+  .cliente-dropdown.open { display:block; }
+  .cli-item { padding:9px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .cli-item:hover { background:rgba(29,114,232,0.15); }
+  .cli-item-name { font-weight:700; font-size:13px; color:#f0f4f8; }
+  .cli-item-meta { font-size:11px; color:var(--hawk-muted); margin-top:2px; }
   .hist-total { font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:700; color:#22c55e; }
   .hist-items { font-size:11px; color:var(--hawk-silver-dim); margin-top:4px; }
   .hist-btn-row { display:flex; gap:8px; margin-top:8px; }
@@ -486,13 +503,21 @@
   <!-- DATOS CLIENTE -->
   <div class="section-title">Cliente</div>
   <div class="panel">
+    <!-- Tipo toggle -->
+    <div class="tipo-toggle">
+      <button class="tipo-btn active-final" id="btnTipoFinal" onclick="setTipoCliente('final')">👤 Cliente Final</button>
+      <button class="tipo-btn" id="btnTipoDist" onclick="setTipoCliente('distribuidor')">🏪 Distribuidor <span class="tipo-badge badge-dist" id="badgePreciosDist" style="display:none">Precio mayorista</span></button>
+    </div>
+    <input type="hidden" id="tipoCliente" value="final">
+    <input type="hidden" id="clienteRegistradoId" value="">
     <div class="form-grid">
-      <div class="form-group full">
+      <div class="form-group full cliente-search-wrap">
         <label>Nombre del Cliente *</label>
-        <input type="text" id="clienteNombre" placeholder="Nombre completo" autocomplete="off">
+        <input type="text" id="clienteNombre" placeholder="Nombre completo o buscar existente..." autocomplete="off" oninput="buscarClienteLocal(this.value)">
+        <div class="cliente-dropdown" id="clienteDropdown"></div>
       </div>
       <div class="form-group">
-        <label>Cédula / NIT</label>
+        <label id="labelDocCliente">Cédula / NIT</label>
         <input type="text" id="clienteId" placeholder="000.000.000" inputmode="numeric">
       </div>
       <div class="form-group">
@@ -1070,6 +1095,106 @@ let facturas      = []; // historial local
 let config        = {};
 let _pendingVenta = null; // venta pendiente desde modal
 
+// ── CLIENTES ─────────────────────────────────────────────
+let clientes = [];
+
+function setTipoCliente(tipo) {
+  document.getElementById('tipoCliente').value = tipo;
+  const btnFinal = document.getElementById('btnTipoFinal');
+  const btnDist  = document.getElementById('btnTipoDist');
+  const badge    = document.getElementById('badgePreciosDist');
+  const labelDoc = document.getElementById('labelDocCliente');
+  if (tipo === 'distribuidor') {
+    btnFinal.className = 'tipo-btn';
+    btnDist.className  = 'tipo-btn active-dist';
+    badge.style.display = 'inline-block';
+    labelDoc.textContent = 'NIT del Distribuidor';
+    document.getElementById('clienteId').placeholder = 'NIT del distribuidor';
+  } else {
+    btnFinal.className = 'tipo-btn active-final';
+    btnDist.className  = 'tipo-btn';
+    badge.style.display = 'none';
+    labelDoc.textContent = 'Cédula / NIT';
+    document.getElementById('clienteId').placeholder = '000.000.000';
+  }
+  // Refresh item prices
+  refreshItemPrices();
+}
+
+function refreshItemPrices() {
+  const esDist = document.getElementById('tipoCliente').value === 'distribuidor';
+  document.querySelectorAll('.item-row').forEach(row => {
+    const descEl  = row.querySelector('[id^="itemDesc"]');
+    const priceEl = row.querySelector('[id^="itemPrice"]');
+    if (!descEl || !priceEl) return;
+    const nombre = descEl.value.trim();
+    const prod = inventario.find(p => p.nombre.trim() === nombre);
+    if (!prod) return;
+    const nuevoPrecio = (esDist && prod.precio_dist > 0) ? prod.precio_dist : prod.precio;
+    priceEl.value = nuevoPrecio;
+    // Trigger recalc
+    priceEl.dispatchEvent(new Event('input'));
+  });
+}
+
+async function cargarClientesCloud() {
+  try {
+    const data = await apiFetch('getClientes', { method:'GET', payload:{} });
+    if (data && data.clientes) clientes = data.clientes;
+  } catch(e) { /* silent */ }
+}
+
+function buscarClienteLocal(query) {
+  const drop = document.getElementById('clienteDropdown');
+  if (!query || query.length < 2) { drop.classList.remove('open'); return; }
+  const q = query.toLowerCase();
+  const matches = clientes.filter(c =>
+    c.nombre.toLowerCase().includes(q) ||
+    (c.telefono && c.telefono.includes(q)) ||
+    (c.cedula && c.cedula.includes(q))
+  ).slice(0, 6);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(c => `
+    <div class="cli-item" onmousedown="seleccionarCliente('${escJ(JSON.stringify(c))}')">
+      <div class="cli-item-name">${c.nombre} <span class="tipo-badge ${c.tipo==='distribuidor'?'badge-dist':'badge-final'}">${c.tipo==='distribuidor'?'Distribuidor':'Cliente Final'}</span></div>
+      <div class="cli-item-meta">${c.telefono||''} ${c.cedula?'· '+c.cedula:''} ${c.direccion?'· '+c.direccion:''}</div>
+    </div>`).join('');
+  drop.classList.add('open');
+}
+
+function seleccionarCliente(jsonStr) {
+  const c = JSON.parse(jsonStr);
+  document.getElementById('clienteNombre').value  = c.nombre;
+  document.getElementById('clienteId').value      = c.cedula || '';
+  document.getElementById('clienteTel').value     = c.telefono || '';
+  document.getElementById('clienteDir').value     = c.direccion || '';
+  document.getElementById('clienteEmail').value   = c.email || '';
+  document.getElementById('clienteRegistradoId').value = c.id || '';
+  document.getElementById('clienteDropdown').classList.remove('open');
+  // Set tipo
+  if (c.tipo === 'distribuidor') setTipoCliente('distribuidor');
+  else setTipoCliente('final');
+}
+
+async function guardarClienteCloud(clienteData) {
+  try {
+    const data = await apiFetch('saveCliente', { method:'GET', payload: clienteData });
+    if (data && data.id) {
+      // Add to local array
+      clientes.unshift({ ...clienteData, id: data.id });
+    }
+  } catch(e) { /* silent */ }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const wrap = document.querySelector('.cliente-search-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const drop = document.getElementById('clienteDropdown');
+    if (drop) drop.classList.remove('open');
+  }
+});
+
 // ── INIT ─────────────────────────────────────────────
 function init() {
   initUrlPass();
@@ -1080,6 +1205,7 @@ function init() {
   addItem(); addItem();
   cargarFacturasCloud();
   recargarInventarioCloud();
+  cargarClientesCloud();
 }
 
 function loadUserPins() {
@@ -1230,6 +1356,7 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
       clienteTel:   venta.clienteTel,
       clienteDir:   venta.clienteDir,
       clienteEmail: venta.clienteEmail,
+      tipoCliente:  venta.tipoCliente || 'final',
       estado:       venta.estado,
       subtotal:     venta.subtotal,
       iva:          venta.iva,
@@ -1323,6 +1450,7 @@ function parseInventario() {
       stockMin: parseFloat(row[5]) || 0,
       costo:    parseFloat(row[6]) || 0,
       precio:   parseFloat(row[7]) || 0,
+      precio_dist: parseFloat(row[8]) || 0,
       rowIdx:   i
     });
   }
@@ -1426,19 +1554,25 @@ function onDescInput(n) {
   drop.innerHTML = matches.map(p => {
     const sc = p.stock <= 0 ? 'stock-none' : p.stock <= p.stockMin ? 'stock-low' : 'stock-ok';
     const sl = p.stock <= 0 ? '⚠ Sin stock' : p.stock <= p.stockMin ? `⚠ Stock: ${p.stock}` : `✓ ${p.stock}`;
+    const esDist2 = document.getElementById('tipoCliente').value === 'distribuidor';
+    const precioShow = (esDist2 && p.precio_dist > 0) ? p.precio_dist : p.precio;
+    const distTag = (esDist2 && p.precio_dist > 0) ? ' <span class="precio-dist-tag">★ mayorista</span>' : '';
     return `<div class="autocomplete-item" ontouchstart="selectProduct(${n},'${escJ(p.nombre)}',${p.precio},${p.stock},'${escJ(p.categoria)}')" onmousedown="selectProduct(${n},'${escJ(p.nombre)}',${p.precio},${p.stock},'${escJ(p.categoria)}')">
       <span class="ac-name">${p.nombre} <small style="color:var(--hawk-silver-dim)">[${p.id}]</small></span>
-      <span class="ac-meta"><span class="${sc}">${sl}</span><span class="ac-price">${fmt(p.precio)}</span><span>${p.categoria}</span></span>
+      <span class="ac-meta"><span class="${sc}">${sl}</span><span class="ac-price">${fmt(precioShow)}${distTag}</span><span>${p.categoria}</span></span>
     </div>`;
   }).join('');
   drop.style.display = 'block';
 }
 
 function selectProduct(n, nombre, precio, stock, categoria) {
+  const esDist = document.getElementById('tipoCliente').value === 'distribuidor';
+  const prod = inventario.find(p => p.nombre.trim() === nombre.trim());
+  const precioReal = (esDist && prod && prod.precio_dist > 0) ? prod.precio_dist : precio;
   const descEl = document.getElementById('desc_'+n);
   if (descEl) { descEl.value = nombre; descEl.dataset.categoria = categoria; }
   const priceEl = document.getElementById('price_'+n);
-  if (priceEl) priceEl.value = precio;
+  if (priceEl) priceEl.value = precioReal;
   const drop = document.getElementById('drop_'+n);
   if (drop) drop.style.display = 'none';
   calcTotals();
@@ -1488,6 +1622,8 @@ function clearAll(skipConfirm) {
   ['clienteNombre','clienteId','clienteTel','clienteDir','notas'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  document.getElementById('clienteRegistradoId').value = '';
+  setTipoCliente('final');
   document.getElementById('ivaCheck').checked = false;
   const estadoEl = document.getElementById('estado');
   if (estadoEl) estadoEl.value = 'Pagada';
@@ -1621,6 +1757,7 @@ async function guardarVenta() {
     clienteTel: document.getElementById('clienteTel').value,
     clienteDir: document.getElementById('clienteDir').value,
     clienteEmail: document.getElementById('clienteEmail').value,
+    tipoCliente: document.getElementById('tipoCliente').value,
     estado:     document.getElementById('estado').value,
     notas:      document.getElementById('notas').value,
     vendedor:   usuarioActual ? usuarioActual.nombre : 'Admin',
@@ -1632,6 +1769,22 @@ async function guardarVenta() {
     abono:      abonoVal,
     pendiente:  pendienteVal
   };
+
+  // Auto-save new client if not already registered
+  const clienteRegistradoId = document.getElementById('clienteRegistradoId').value;
+  if (!clienteRegistradoId && venta.clienteTel) {
+    const yaExiste = clientes.some(c => c.telefono === venta.clienteTel || c.nombre.toLowerCase() === clienteNombre.toLowerCase());
+    if (!yaExiste) {
+      guardarClienteCloud({
+        tipo:      venta.tipoCliente,
+        nombre:    clienteNombre,
+        telefono:  venta.clienteTel,
+        cedula:    venta.clienteId,
+        direccion: venta.clienteDir,
+        email:     venta.clienteEmail
+      });
+    }
+  }
 
   facturas.unshift(venta);
 
