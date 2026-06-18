@@ -2339,8 +2339,8 @@ function cambiarContrasenaUrl() {
 // ── CERRAR DÍA MANUAL ────────────────────────────────
 async function cerrarDiaManual() {
   const btn = document.getElementById('btnCerrarDia');
-  const hoy = new Date();
-  const fecha = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-' + String(hoy.getDate()).padStart(2,'0');
+  const filtroEl = document.getElementById('filtroFecha');
+  const fecha = (filtroEl && filtroEl.value) ? filtroEl.value : fechaLocalStr();
 
   if (!confirm('¿Cerrar el día ' + fecha + '? Esto guardará el resumen en la pestaña Cierres.')) return;
 
