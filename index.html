@@ -2333,7 +2333,7 @@ async function cerrarDiaManual() {
       showToast('⚠ ' + (data.msg || 'No se pudo cerrar'), 'error');
     }
   } catch(e) {
-    showToast('⚠ Error de conexión', 'error');
+    showToast('⚠ ' + (e.message || 'Error de conexión'), 'error');
   } finally {
     btn.textContent = '🔒 Cerrar Día';
     btn.disabled = false;
@@ -2358,6 +2358,7 @@ async function rotBuscarYCargar() {
     document.getElementById('rotDestTel').value = factura.clienteTel || '';
     document.getElementById('rotDestDir').value = factura.clienteDir || '';
     document.getElementById('rotDestEmail').value = factura.clienteEmail || '';
+    document.getElementById('rotDestDoc').value = factura.clienteId || '';
     document.getElementById('rotEnvFactura').value = factura.factura || num;
     document.getElementById('rotEnvValor').value = factura.total || '';
 
