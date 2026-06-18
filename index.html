@@ -1343,11 +1343,9 @@ function detectVentasCount() {
 }
 
 function updateFacturaNumFromHistorial() {
-  const hoy = fechaLocalStr();
-  // Solo contar facturas de HOY para el número del día
-  const facturasHoy = facturas.filter(f => (f.fecha||'').toString().slice(0,10) === hoy && f.estado !== 'Anulada');
+  // Nunca reutilizar un número de factura, incluso si fue anulada o es de otro día
   let maxNum = 0;
-  facturasHoy.forEach(f => {
+  facturas.forEach(f => {
     const m = String(f.factura||'').match(/(\d+)$/);
     if (m) { const n = parseInt(m[1]); if (n > maxNum) maxNum = n; }
   });
@@ -1855,7 +1853,7 @@ function cerrarAnularModal() {
   _anularId = null;
 }
 
-function confirmarAnulacion() {
+async function confirmarAnulacion() {
   const f = facturas.find(x => String(x.id) === String(_anularId));
   if (!f) return;
   const motivo = document.getElementById('anularMotivo')?.value || '';
@@ -1879,7 +1877,7 @@ function confirmarAnulacion() {
   // Mark as anulada locally and in cloud
   f.estado = 'Anulada';
   saveFacturas();
-  anularFacturaCloud(f.id, f.motivoAnulacion); // async, no blocker
+  anularFacturaCloud(f.factura, f.motivoAnulacion); // async, no blocker
   renderHistorial();
   renderStats();
 
@@ -1897,6 +1895,18 @@ function confirmarAnulacion() {
   showToast('✅ Factura anulada y stock restaurado', 'success');
   // Guardar estado anulado en localStorage para persistir entre recargas
   saveFacturas();
+
+  // Verificar si el día de esta factura ya fue cerrado, para avisar que debe recerrarse
+  try {
+    const fechaFactura = (f.fecha || '').toString().slice(0,10);
+    const check = await apiFetch('verificarCierre', { payload: { fecha: fechaFactura } });
+    if (check && check.cerrado) {
+      setTimeout(() => {
+        showToast('⚠ El día ' + fechaFactura.split('-').reverse().join('/') + ' ya estaba cerrado — vuelve a presionar "Cerrar Día" para actualizar el resumen', 'error');
+      }, 2200);
+    }
+  } catch(e) { /* silencioso, no bloquea el flujo de anulación */ }
+
   setTimeout(() => cerrarAnularModal(), 2000);
 }
 
