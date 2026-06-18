@@ -396,7 +396,7 @@
     body { background:#fff; color:#111; }
     body::before { display:none; }
     .page, .topbar, .panel, .btn, #toast, .tab-bar { display:none !important; }
-    #previewModal { position:static; background:none; padding:0; display:block !important; }
+    #previewModal.open { position:static !important; background:none !important; padding:0 !important; display:block !important; }
     .modal-box { box-shadow:none; }
     .modal-actions { display:none; }
   }
@@ -1076,7 +1076,7 @@ function init() {
   loadConfig();
   loadUserPins();
   setVendedorField();
-  document.getElementById('facturaFecha').valueAsDate = new Date();
+  document.getElementById('facturaFecha').value = fechaLocalStr();
   addItem(); addItem();
   cargarFacturasCloud();
   recargarInventarioCloud();
