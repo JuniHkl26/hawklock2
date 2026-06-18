@@ -1105,7 +1105,7 @@ function showPage(name, btn) {
   if (name === 'inventario') renderInventario();
   if (name === 'historial') {
     // Poner filtro en hoy por defecto
-    const hoyStr = new Date().toISOString().split('T')[0];
+    const hoyStr = fechaLocalStr();
     const filtroEl = document.getElementById('filtroFecha');
     if (filtroEl && !filtroEl.value) filtroEl.value = hoyStr;
     renderHistorial(); renderStats();
@@ -1343,7 +1343,7 @@ function detectVentasCount() {
 }
 
 function updateFacturaNumFromHistorial() {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = fechaLocalStr();
   // Solo contar facturas de HOY para el número del día
   const facturasHoy = facturas.filter(f => (f.fecha||'').toString().slice(0,10) === hoy && f.estado !== 'Anulada');
   let maxNum = 0;
@@ -1362,6 +1362,11 @@ function updateInvBadge() {
 }
 
 // ── FORMAT ───────────────────────────────────────────
+function fechaLocalStr(d) {
+  const dt = d || new Date();
+  return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+}
+
 function fmt(n) { return '$' + Number(n).toLocaleString('es-CO', {minimumFractionDigits:0, maximumFractionDigits:0}); }
 function escJ(s) { return String(s).replace(/'/g,"\\'").replace(/"/g,'\\"'); }
 
@@ -1520,7 +1525,13 @@ function generateInvoice() {
 
   document.getElementById('invoiceHTML').innerHTML = `
     <div class="inv-header">
-      <img src="${LOGO}" alt="Hawk Lock">
+      <div class="inv-brand">
+        <img src="${LOGO_ICON}" alt="Hawk Lock">
+        <div class="inv-brand-text">
+          <div class="inv-brand-hawk">HAWK <span style="color:#3d9bff">LOCK</span></div>
+          <div class="inv-brand-lock">SEGURIDAD VEHICULAR</div>
+        </div>
+      </div>
       <div class="inv-meta">
         <div class="inv-num">${document.getElementById('facturaNum').value||'FAC-0001'}</div>
         <div class="inv-date">Fecha: ${fecha}</div>
@@ -1578,7 +1589,9 @@ async function guardarVenta() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
 
   const facturaNum = document.getElementById('facturaNum').value.trim() || 'FAC-0001';
-  const fechaVal   = document.getElementById('facturaFecha').value || new Date().toISOString().split('T')[0];
+  const hoyLocal = new Date();
+  const fechaHoyStr = hoyLocal.getFullYear() + '-' + String(hoyLocal.getMonth()+1).padStart(2,'0') + '-' + String(hoyLocal.getDate()).padStart(2,'0');
+  const fechaVal   = document.getElementById('facturaFecha').value || fechaHoyStr;
   const useIva     = document.getElementById('ivaCheck').checked;
   const sub        = items.reduce((a,i)=>a+i.total, 0);
   const iva        = useIva ? sub * 0.19 : 0;
@@ -1719,7 +1732,7 @@ function renderHistorial() {
     if (resumenDiv) resumenDiv.style.display = 'none';
   }
 
-  const hoyBadge = new Date().toISOString().split('T')[0];
+  const hoyBadge = fechaLocalStr();
   const factHoy = facturas.filter(f => (f.fecha||'').toString().slice(0,10) === hoyBadge).length;
   document.getElementById('histCountBadge').textContent = factHoy + ' factura(s) hoy';
   if (!filtered.length) {
@@ -1937,7 +1950,7 @@ function renderInventario() {
 
 // ── STATS ─────────────────────────────────────────────
 function renderStats() {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = fechaLocalStr();
   const totalVentas = facturas.reduce((a,f)=>a+f.total,0);
   const hoyCount = facturas.filter(f=>f.fecha===hoy).length;
   document.getElementById('statFacturas').textContent = facturas.length;
@@ -2053,7 +2066,7 @@ async function guardarGasto() {
   const total = subtotal + iva;
 
   const payload = {
-    fecha:      document.getElementById('gastoFecha').value || new Date().toISOString().split('T')[0],
+    fecha:      document.getElementById('gastoFecha').value || fechaLocalStr(),
     proveedor,
     producto,
     categoria:  document.getElementById('gastoCategoria').value,
