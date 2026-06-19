@@ -1154,16 +1154,19 @@ function buscarClienteLocal(query) {
     (c.cedula && c.cedula.includes(q))
   ).slice(0, 6);
   if (!matches.length) { drop.classList.remove('open'); return; }
-  drop.innerHTML = matches.map(c => `
-    <div class="cli-item" onmousedown="seleccionarCliente('${escJ(JSON.stringify(c))}')">
+  // Store matches globally for selection by index
+  window._clienteMatches = matches;
+  drop.innerHTML = matches.map((c, i) => `
+    <div class="cli-item" onmousedown="seleccionarCliente(${i})">
       <div class="cli-item-name">${c.nombre} <span class="tipo-badge ${c.tipo==='distribuidor'?'badge-dist':'badge-final'}">${c.tipo==='distribuidor'?'Distribuidor':'Cliente Final'}</span></div>
       <div class="cli-item-meta">${c.telefono||''} ${c.cedula?'· '+c.cedula:''} ${c.direccion?'· '+c.direccion:''}</div>
     </div>`).join('');
   drop.classList.add('open');
 }
 
-function seleccionarCliente(jsonStr) {
-  const c = JSON.parse(jsonStr);
+function seleccionarCliente(idx) {
+  const c = (window._clienteMatches || [])[idx];
+  if (!c) return;
   document.getElementById('clienteNombre').value  = c.nombre;
   document.getElementById('clienteId').value      = c.cedula || '';
   document.getElementById('clienteTel').value     = c.telefono || '';
@@ -1171,7 +1174,6 @@ function seleccionarCliente(jsonStr) {
   document.getElementById('clienteEmail').value   = c.email || '';
   document.getElementById('clienteRegistradoId').value = c.id || '';
   document.getElementById('clienteDropdown').classList.remove('open');
-  // Set tipo
   if (c.tipo === 'distribuidor') setTipoCliente('distribuidor');
   else setTipoCliente('final');
 }
