@@ -1527,6 +1527,11 @@ function addItem() {
           <input type="number" id="price_${n}" value="0" min="0" step="1000" inputmode="numeric"
             style="text-align:right;font-size:16px" oninput="calcTotals()">
         </div>
+        <div class="form-group" style="flex:1">
+          <label>Desc.%</label>
+          <input type="number" id="disc_${n}" value="0" min="0" max="100" inputmode="numeric"
+            style="text-align:center;font-size:16px" oninput="calcTotals()">
+        </div>
       </div>
       <div class="item-total-display" id="tot_${n}">$0</div>
     </div>`;
@@ -1593,7 +1598,8 @@ function calcTotals() {
     const n = row.id.replace('item_','');
     const qty   = parseFloat(document.getElementById('qty_'+n)?.value)||0;
     const price = parseFloat(document.getElementById('price_'+n)?.value)||0;
-    const t = qty * price;
+    const disc  = parseFloat(document.getElementById('disc_'+n)?.value)||0;
+    const t = qty * price * (1 - disc/100);
     sub += t;
     const el = document.getElementById('tot_'+n);
     if (el) el.textContent = fmt(t);
@@ -1612,8 +1618,10 @@ function getItems() {
     const desc  = document.getElementById('desc_'+n)?.value.trim() || '';
     const qty   = parseFloat(document.getElementById('qty_'+n)?.value)||0;
     const price = parseFloat(document.getElementById('price_'+n)?.value)||0;
+    const disc  = parseFloat(document.getElementById('disc_'+n)?.value)||0;
     const cat   = document.getElementById('desc_'+n)?.dataset.categoria || '';
-    if (desc || price) items.push({desc, qty, price, total: qty*price, categoria: cat});
+    const total = qty * price * (1 - disc/100);
+    if (desc || price) items.push({desc, qty, price, descuento: disc, total, categoria: cat});
   });
   return items;
 }
