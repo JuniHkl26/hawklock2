@@ -2230,6 +2230,10 @@ async function guardarGasto() {
   const subtotal = cant * costo;
   const total = subtotal + iva;
 
+  const estadoGasto = document.getElementById('gastoEstado').value;
+  const pendienteCalc = estadoGasto === 'Pagado' ? 0 : parseFloat(document.getElementById('gastoPendiente').value)||0;
+  const abonoCalc = estadoGasto === 'Pagado' ? total : abono;
+
   const payload = {
     fecha:      document.getElementById('gastoFecha').value || fechaLocalStr(),
     proveedor,
@@ -2240,9 +2244,9 @@ async function guardarGasto() {
     subtotal:   subtotal,
     iva,
     total:      total,
-    abono,
-    estado:     document.getElementById('gastoEstado').value,
-    pendiente:  parseFloat(document.getElementById('gastoPendiente').value)||0
+    abono:      abonoCalc,
+    estado:     estadoGasto,
+    pendiente:  pendienteCalc
   };
 
   try {
