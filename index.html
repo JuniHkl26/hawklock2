@@ -522,7 +522,7 @@
       </div>
       <div class="form-group">
         <label>Teléfono</label>
-        <input type="tel" id="clienteTel" placeholder="+57 300 000 0000">
+        <input type="tel" id="clienteTel" placeholder="+57 300 000 0000" onblur="autoGuardarClientePorTelefono()">
       </div>
       <div class="form-group">
         <label>N° Factura</label>
@@ -1187,6 +1187,26 @@ async function guardarClienteCloud(clienteData) {
       clientes.unshift({ ...clienteData, id: data.id });
     }
   } catch(e) { /* silent */ }
+}
+
+async function autoGuardarClientePorTelefono() {
+  const tel    = (document.getElementById('clienteTel')    || {}).value || '';
+  const nombre = (document.getElementById('clienteNombre') || {}).value || '';
+  const cedula = (document.getElementById('clienteId')     || {}).value || '';
+  const dir    = (document.getElementById('clienteDir')    || {}).value || '';
+  const email  = (document.getElementById('clienteEmail')  || {}).value || '';
+  const tipo   = (document.getElementById('tipoCliente')   || {}).value || 'final';
+  const yaRegistrado = (document.getElementById('clienteRegistradoId') || {}).value || '';
+
+  if (!tel || !nombre || yaRegistrado) return;
+
+  const telLimpio = tel.replace(/[^0-9]/g, '');
+  const yaExiste = clientes.some(c =>
+    c.telefono && c.telefono.replace(/[^0-9]/g, '') === telLimpio
+  );
+  if (yaExiste) return;
+
+  await guardarClienteCloud({ tipo, nombre, telefono: tel, cedula, direccion: dir, email });
 }
 
 // Close dropdown when clicking outside
