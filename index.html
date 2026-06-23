@@ -1328,19 +1328,15 @@ async function cargarFacturasCloud() {
       })()
     })).filter(f => !blacklist.includes(String(f.id))).reverse();
     setSyncStatus('ok');
-    // Limpiar localStorage para evitar datos viejos al próximo inicio
-    localStorage.removeItem('hl_facturas');
+    localStorage.removeItem('hl_facturas'); // limpiar cualquier caché viejo
     updateFacturaNumFromHistorial();
     renderHistorial();
     renderStats();
   } catch(e) {
     console.error('Error cargarFacturasCloud:', e);
     setSyncStatus('error');
-    // Fallback offline - solo si no hay conexión
-    try { facturas = JSON.parse(localStorage.getItem('hl_facturas') || '[]'); } catch(_) { facturas = []; }
-    if (facturas.length > 0) {
-      showToast('⚠ Sin conexión — mostrando datos locales', 'error');
-    }
+    facturas = []; // nunca usar caché viejo — siempre datos frescos o nada
+    showToast('⚠ Sin conexión con el servidor — recarga cuando tengas señal', 'error');
     updateFacturaNumFromHistorial();
     renderHistorial();
     renderStats();
@@ -1376,13 +1372,11 @@ async function guardarFacturaCloud(venta, stockUpdates=[]) {
       payload
     });
     setSyncStatus('ok');
-    localStorage.setItem('hl_facturas', JSON.stringify(facturas));
     return true;
   } catch(e) {
     console.error('Error guardarFacturaCloud:', e);
     setSyncStatus('error');
-    localStorage.setItem('hl_facturas', JSON.stringify(facturas));
-    showToast('⚠ Guardado local — reintenta cuando tengas conexión', 'error');
+    showToast('⚠ Error al guardar — reintenta', 'error');
     return false;
   }
 }
@@ -1401,13 +1395,8 @@ async function anularFacturaCloud(id, motivo='') {
 }
 
 function saveFacturas() {
-  // Keep local backup including estado (anulada, etc.)
-  localStorage.setItem('hl_facturas', JSON.stringify(facturas));
-  // También persistir estados de anuladas para que sobrevivan la recarga desde nube
-  const anuladas = facturas.filter(f => f.estado === 'Anulada').map(f => String(f.id));
-  let blacklist = JSON.parse(localStorage.getItem('hl_blacklist') || '[]');
-  // No agregar anuladas a blacklist automáticamente — solo las eliminadas manualmente
-  // (para que las anuladas sigan apareciendo en el historial con estado Anulada)
+  // La fuente de verdad es Google Sheets — no se guarda caché local de facturas
+  localStorage.removeItem('hl_facturas');
 }
 
 // ── EXCEL LOADER ─────────────────────────────────────
@@ -2686,7 +2675,6 @@ async function completarPagoVenta(id) {
       f.pendiente = 0;
       setSyncStatus('ok');
       showToast('✅ ' + f.factura + ' marcada como pagada', 'success');
-      localStorage.setItem('hl_facturas', JSON.stringify(facturas));
       renderHistorial();
       renderStats();
     } else {
