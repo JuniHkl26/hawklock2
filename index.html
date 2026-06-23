@@ -1092,6 +1092,7 @@ let excelWorkbook = null;
 let inventario    = [];
 let itemCount     = 0;
 let facturas      = []; // historial local
+let gastosCache   = []; // cache local de compras/gastos
 let config        = {};
 let _pendingVenta = null; // venta pendiente desde modal
 
@@ -2292,6 +2293,7 @@ async function cargarGastosCloud() {
       return;
     }
     const gastos = data.gastos.reverse();
+    gastosCache = gastos; // guardar en cache global para completarPagoCompra
     if (badge) badge.textContent = gastos.length + ' gastos';
 
     // Calcular totales globales — usar el total directo del Excel
@@ -2329,6 +2331,10 @@ async function cargarGastosCloud() {
         '<div style="font-size:11px;color:var(--hawk-silver-dim);margin-top:4px;letter-spacing:1px">' +
           'Cant: ' + cant + ' · Costo unit: ' + fmt(costoU) + (ivaG > 0 ? ' · IVA: ' + fmt(ivaG) : '') +
         '</div>' +
+        (g.estado !== 'Pagado' ? '<div class="hist-btn-row" style="margin-top:10px">' +
+          '<button class="hist-btn" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);color:#22c55e" ' +
+          'onclick="completarPagoCompra(\'' + g.factura + '\')">✅ Completar pago</button>' +
+        '</div>' : '') +
       '</div>';
     }).join('');
   } catch(e) {
@@ -2688,6 +2694,36 @@ async function completarPagoVenta(id) {
     }
   } catch(e) {
     console.error('Error completando pago:', e);
+    setSyncStatus('error');
+    showToast('⚠ Error al actualizar — vuelve a intentar', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Completar pago'; }
+  }
+}
+
+async function completarPagoCompra(factura) {
+  const g = gastosCache.find(x => String(x.factura) === String(factura));
+  if (!g) return;
+  if (!confirm('¿Confirmar que ' + g.factura + ' fue pagada en su totalidad?')) return;
+
+  const btn = document.querySelector(`button[onclick="completarPagoCompra('${factura}')"]`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Actualizando...'; }
+
+  try {
+    setSyncStatus('syncing');
+    const resp = await apiFetch('actualizarEstadoCompra', {
+      payload: { factura: String(g.factura), estado: 'Pagado', abono: parseFloat(g.total) || 0, pendiente: 0 }
+    });
+    if (resp && resp.ok) {
+      g.estado = 'Pagado';
+      g.pendiente = 0;
+      setSyncStatus('ok');
+      showToast('✅ ' + g.factura + ' marcada como pagada', 'success');
+      cargarGastosCloud();
+    } else {
+      throw new Error('El servidor no confirmó la actualización');
+    }
+  } catch(e) {
+    console.error('Error completando pago compra:', e);
     setSyncStatus('error');
     showToast('⚠ Error al actualizar — vuelve a intentar', 'error');
     if (btn) { btn.disabled = false; btn.textContent = '✅ Completar pago'; }
