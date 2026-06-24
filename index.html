@@ -9,6 +9,8 @@
 <title>HAWK LOCK — Facturación</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root {
     --hawk-black: #080c10;
@@ -971,6 +973,7 @@
       <button class="btn-close-modal" onclick="closeModal()">✕ Cerrar</button>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-print" onclick="window.print()" style="background:rgba(29,114,232,0.15);border:1px solid #1d72e8;color:#3d9bff">🖨 Imprimir</button>
+        <button class="btn-print" onclick="descargarPDF()" style="background:linear-gradient(135deg,#0f4c81,#1d72e8);border:none;color:#fff">📄 PDF</button>
         <button class="btn-print" onclick="enviarWhatsApp()" style="background:#128C7E;border:none;color:#fff">📲 WhatsApp</button>
         <button class="btn-print" onclick="guardarDesdeModal()">💾 Guardar</button>
       </div>
@@ -1928,6 +1931,7 @@ function renderHistorial() {
       <div class="hist-items">${itemsStr}</div>
       <div class="hist-btn-row">
         <button class="hist-btn hist-btn-view" onclick="verFactura('${f.id}')">👁 Ver</button>
+        <button class="hist-btn" style="background:rgba(29,114,232,0.15);border:1px solid rgba(29,114,232,0.4);color:#3d9bff" onclick="descargarPDFById('${f.id}')">📄 PDF</button>
         ${f.estado === 'Abono'
           ? `<button class="hist-btn" style="background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.3);color:#22c55e" onclick="completarPagoVenta('${f.id}')">✅ Completar pago</button>`
           : ''
@@ -1944,6 +1948,7 @@ function renderHistorial() {
 function verFactura(id) {
   const f = facturas.find(x=>String(x.id)===String(id));
   if (!f) return;
+  window._currentFacturaId = id; // track for PDF download
   const rows = f.items.map(i=>`<tr><td>${i.desc}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${fmt(i.price)}</td><td style="text-align:right"><strong>${fmt(i.total)}</strong></td></tr>`).join('');
   const ivaRow = f.useIva ? `<div class="inv-total-row"><span>IVA (19%)</span><span>${fmt(f.iva)}</span></div>` : '';
   const notasHtml = f.notas ? `<div class="inv-notes"><strong>📋 NOTAS</strong>${f.notas}</div>` : '';
@@ -2742,6 +2747,290 @@ function toggleAbonoVenta() {
   const estado = document.getElementById('estado').value;
   const group = document.getElementById('abonoVentaGroup');
   group.style.display = (estado === 'Abono') ? 'block' : 'none';
+}
+
+// ── PDF BRANDING ──────────────────────────────────────
+function descargarPDF() {
+  const id = window._currentFacturaId;
+  if (!id) { showToast('⚠ Abre una factura primero', 'error'); return; }
+  descargarPDFById(id);
+}
+
+function descargarPDFById(id) {
+  const f = facturas.find(x => String(x.id) === String(id));
+  if (!f) { showToast('⚠ Factura no encontrada', 'error'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, mg = 14;
+  const cw = W - mg * 2; // content width: 182mm
+
+  // ── COLORES ──
+  const C_DARK  = [8, 12, 16];
+  const C_BLUE  = [29, 114, 232];
+  const C_LBLUE = [61, 155, 255];
+  const C_MID   = [13, 26, 46];
+  const C_WHITE = [240, 244, 248];
+  const C_GRAY  = [122, 144, 166];
+  const C_LIGHT = [248, 250, 252];
+  const C_LINE  = [226, 232, 240];
+
+  const estadoColor = f.estado === 'Pagada'
+    ? [34, 197, 94]
+    : f.estado === 'Anulada'
+    ? [239, 68, 68]
+    : [245, 158, 11];
+
+  const emisorNombre = config.emisorNombre || 'Hawk Lock';
+  const fechaDisplay = f.fecha
+    ? new Date(f.fecha + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })
+    : (f.fecha || '');
+
+  // ── HELPER ──
+  const fmtPDF = v => '$' + Number(v || 0).toLocaleString('es-CO');
+
+  let y = 0;
+
+  // ── HEADER DARK BG ──
+  doc.setFillColor(...C_DARK);
+  doc.rect(0, 0, W, 38, 'F');
+
+  // Logo (base64 PNG de LOGO_ICON)
+  try {
+    doc.addImage(LOGO_ICON, 'PNG', mg, 8, 18, 18);
+  } catch(e) { /* si falla, continúa sin logo */ }
+
+  // Brand name
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(...C_WHITE);
+  doc.text('HAWK', mg + 22, 16);
+  doc.setTextColor(...C_LBLUE);
+  doc.text('LOCK', mg + 22 + doc.getTextWidth('HAWK '), 16);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...C_GRAY);
+  doc.text('SEGURIDAD VEHICULAR', mg + 22, 21);
+
+  // Invoice number (right)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.setTextColor(...C_WHITE);
+  doc.text(f.factura, W - mg, 15, { align: 'right' });
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...C_GRAY);
+  doc.text('Fecha: ' + fechaDisplay, W - mg, 21, { align: 'right' });
+
+  // Status badge (right)
+  const estadoText = f.estado.toUpperCase();
+  const stW = doc.getTextWidth(estadoText) + 6;
+  doc.setFillColor(...estadoColor.map(c => Math.min(255, c * 0.25)));
+  doc.roundedRect(W - mg - stW, 24, stW, 7, 1.5, 1.5, 'F');
+  doc.setDrawColor(...estadoColor);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(W - mg - stW, 24, stW, 7, 1.5, 1.5, 'S');
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...estadoColor);
+  doc.text(estadoText, W - mg - stW / 2, 29, { align: 'center' });
+
+  y = 38;
+
+  // ── BLUE STRIPE ──
+  doc.setFillColor(...C_BLUE);
+  doc.rect(0, y, W, 3, 'F');
+  y += 3;
+
+  // ── PARTIES (2 columns) ──
+  y += 5;
+  const colW = (cw - 6) / 2;
+
+  // Helper: draw a party box
+  function drawPartyBox(x, yy, label, name, detail) {
+    doc.setFillColor(...C_LIGHT);
+    doc.setDrawColor(...C_LINE);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x, yy, colW, 30, 2, 2, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...C_BLUE);
+    doc.text(label, x + 4, yy + 6);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(17, 17, 17);
+    doc.text(name, x + 4, yy + 13);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(85, 85, 85);
+    const lines = detail.split('\n');
+    lines.forEach((line, i) => {
+      doc.text(line, x + 4, yy + 19 + i * 4.5);
+    });
+  }
+
+  drawPartyBox(
+    mg, y,
+    'EMISOR',
+    emisorNombre,
+    'NIT: ' + (config.emisorNit || 'N/A') +
+    '\n' + (config.emisorDir || '') +
+    '\nTel: ' + (config.emisorTel || '')
+  );
+
+  drawPartyBox(
+    mg + colW + 6, y,
+    'CLIENTE',
+    f.cliente || 'N/A',
+    'CC/NIT: ' + (f.clienteId || 'N/A') +
+    '\n' + (f.clienteDir || '') +
+    '\nTel: ' + (f.clienteTel || '')
+  );
+
+  y += 35;
+
+  // ── PRODUCTS TABLE ──
+  const tableRows = f.items.map(i => [
+    i.desc,
+    String(i.qty),
+    fmtPDF(i.price),
+    i.disc ? i.disc + '%' : '-',
+    fmtPDF(i.total)
+  ]);
+
+  doc.autoTable({
+    startY: y,
+    margin: { left: mg, right: mg },
+    head: [['Descripción', 'Cant.', 'Precio unit.', 'Desc.', 'Total']],
+    body: tableRows,
+    theme: 'grid',
+    headStyles: {
+      fillColor: C_DARK,
+      textColor: C_WHITE,
+      fontSize: 8,
+      fontStyle: 'bold',
+      cellPadding: 3,
+    },
+    bodyStyles: {
+      fontSize: 9,
+      cellPadding: 3,
+      textColor: [34, 34, 34],
+    },
+    alternateRowStyles: { fillColor: C_LIGHT },
+    columnStyles: {
+      0: { cellWidth: 'auto' },
+      1: { cellWidth: 16, halign: 'center' },
+      2: { cellWidth: 30, halign: 'right' },
+      3: { cellWidth: 14, halign: 'center' },
+      4: { cellWidth: 30, halign: 'right', fontStyle: 'bold' },
+    },
+    didParseCell(data) {
+      if (data.section === 'head') {
+        data.cell.styles.lineColor = C_BLUE;
+      }
+    }
+  });
+
+  y = doc.lastAutoTable.finalY + 6;
+
+  // ── TOTALS BOX (right-aligned) ──
+  const totW = 72;
+  const totX = W - mg - totW;
+
+  doc.setFillColor(...C_LIGHT);
+  doc.setDrawColor(...C_LINE);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(totX, y, totW, f.useIva ? 40 : 32, 2, 2, 'FD');
+
+  let ty = y + 8;
+  function totRow(label, value, bold = false, color = null) {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(bold ? 10 : 9);
+    doc.setTextColor(...(color || [85, 85, 85]));
+    doc.text(label, totX + 4, ty);
+    doc.text(value, totX + totW - 4, ty, { align: 'right' });
+    doc.setDrawColor(...C_LINE);
+    doc.setLineWidth(0.2);
+    doc.line(totX + 2, ty + 2, totX + totW - 2, ty + 2);
+    ty += 8;
+  }
+
+  totRow('Subtotal', fmtPDF(f.subtotal));
+  if (f.useIva) totRow('IVA (19%)', fmtPDF(f.iva));
+
+  // Total line with blue top border
+  doc.setDrawColor(...C_BLUE);
+  doc.setLineWidth(0.5);
+  doc.line(totX + 2, ty - 2, totX + totW - 2, ty - 2);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(17, 17, 17);
+  doc.text('TOTAL A PAGAR', totX + 4, ty + 5);
+  doc.setTextColor(...C_BLUE);
+  doc.text(fmtPDF(f.total), totX + totW - 4, ty + 5, { align: 'right' });
+  ty += 8;
+
+  // Abono info if partial payment
+  if (f.estado === 'Abono') {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(85, 85, 85);
+    doc.text('Abonado:', totX + 4, ty + 3);
+    doc.text(fmtPDF(f.abono || 0), totX + totW - 4, ty + 3, { align: 'right' });
+    ty += 7;
+    doc.setTextColor(245, 158, 11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Pendiente:', totX + 4, ty + 3);
+    doc.text(fmtPDF(f.pendiente || 0), totX + totW - 4, ty + 3, { align: 'right' });
+  }
+
+  y = Math.max(y + (f.useIva ? 44 : 36), doc.lastAutoTable.finalY + 44);
+
+  // ── NOTAS ──
+  if (f.notas) {
+    y += 4;
+    doc.setFillColor(255, 251, 235);
+    doc.setDrawColor(252, 211, 77);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(mg, y, cw, 16, 2, 2, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...C_BLUE);
+    doc.text('NOTAS:', mg + 4, y + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(85, 85, 85);
+    const notasLines = doc.splitTextToSize(f.notas, cw - 30);
+    doc.text(notasLines, mg + 22, y + 6);
+    y += 20;
+  }
+
+  // ── FOOTER ──
+  const footerY = 282;
+  doc.setDrawColor(...C_LINE);
+  doc.setLineWidth(0.3);
+  doc.line(mg, footerY, W - mg, footerY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...C_GRAY);
+  doc.text('Hawk Lock — Sistema de Facturación', mg, footerY + 5);
+  doc.text('hawklock.com.co  ·  312 633 2199', W - mg, footerY + 5, { align: 'right' });
+
+  // Blue accent bottom line
+  doc.setFillColor(...C_BLUE);
+  doc.rect(0, 292, W, 5, 'F');
+
+  // ── SAVE ──
+  doc.save('Factura_' + f.factura + '_' + (f.cliente || 'Cliente').replace(/\s+/g, '_') + '.pdf');
+  showToast('📄 PDF descargado: ' + f.factura, 'success');
 }
 
 // ── START ─────────────────────────────────────────────
