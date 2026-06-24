@@ -524,7 +524,9 @@
       </div>
       <div class="form-group">
         <label>Teléfono</label>
-        <input type="tel" id="clienteTel" placeholder="+57 300 000 0000" onblur="autoGuardarClientePorTelefono()">
+        <input type="tel" id="clienteTel" placeholder="+57 300 000 0000" 
+          oninput="buscarClienteLocal(this.value)"
+          onblur="autoGuardarClientePorTelefono()">
       </div>
       <div class="form-group">
         <label>N° Factura</label>
@@ -1151,18 +1153,48 @@ async function cargarClientesCloud() {
 function buscarClienteLocal(query) {
   const drop = document.getElementById('clienteDropdown');
   if (!query || query.length < 2) { drop.classList.remove('open'); return; }
-  const q = query.toLowerCase();
-  const matches = clientes.filter(c =>
-    c.nombre.toLowerCase().includes(q) ||
-    (c.telefono && c.telefono.includes(q)) ||
-    (c.cedula && c.cedula.includes(q))
-  ).slice(0, 6);
+  const q = query.toLowerCase().replace(/[^0-9a-záéíóúñ\s]/gi, '');
+
+  // Fuente 1: clientes registrados en la nube
+  // Fuente 2: clientes extraídos del historial local (fallback)
+  const clientesDeFacturas = [];
+  const vistos = new Set();
+  facturas.forEach(f => {
+    if (!f.cliente || vistos.has(f.cliente)) return;
+    vistos.add(f.cliente);
+    clientesDeFacturas.push({
+      id: f.id,
+      nombre: f.cliente,
+      telefono: f.clienteTel || '',
+      cedula: f.clienteId || '',
+      direccion: f.clienteDir || '',
+      email: f.clienteEmail || '',
+      tipo: f.tipoCliente || 'final',
+      _deFactura: true
+    });
+  });
+
+  // Combinar: clientes de nube primero, luego los del historial que no están ya
+  const nombresNube = new Set(clientes.map(c => c.nombre?.toLowerCase()));
+  const fuente = [
+    ...clientes,
+    ...clientesDeFacturas.filter(c => !nombresNube.has(c.nombre?.toLowerCase()))
+  ];
+
+  const matches = fuente.filter(c =>
+    (c.nombre  && c.nombre.toLowerCase().includes(q)) ||
+    (c.telefono && c.telefono.replace(/[^0-9]/g,'').includes(query.replace(/[^0-9]/g,''))) ||
+    (c.cedula  && c.cedula.includes(query))
+  ).slice(0, 7);
+
   if (!matches.length) { drop.classList.remove('open'); return; }
-  // Store matches globally for selection by index
   window._clienteMatches = matches;
   drop.innerHTML = matches.map((c, i) => `
     <div class="cli-item" onmousedown="seleccionarCliente(${i})">
-      <div class="cli-item-name">${c.nombre} <span class="tipo-badge ${c.tipo==='distribuidor'?'badge-dist':'badge-final'}">${c.tipo==='distribuidor'?'Distribuidor':'Cliente Final'}</span></div>
+      <div class="cli-item-name">${c.nombre}
+        <span class="tipo-badge ${c.tipo==='distribuidor'?'badge-dist':'badge-final'}">${c.tipo==='distribuidor'?'Distribuidor':'Cliente Final'}</span>
+        ${c._deFactura ? '<span style="font-size:9px;color:#4a5a70;margin-left:4px">historial</span>' : ''}
+      </div>
       <div class="cli-item-meta">${c.telefono||''} ${c.cedula?'· '+c.cedula:''} ${c.direccion?'· '+c.direccion:''}</div>
     </div>`).join('');
   drop.classList.add('open');
