@@ -1183,7 +1183,7 @@ function buscarClienteLocal(query) {
 
   const matches = fuente.filter(c =>
     (c.nombre  && c.nombre.toLowerCase().includes(q)) ||
-    (c.telefono && c.telefono.replace(/[^0-9]/g,'').includes(query.replace(/[^0-9]/g,''))) ||
+    (c.telefono && String(c.telefono).replace(/[^0-9]/g,'').includes(query.replace(/[^0-9]/g,''))) ||
     (c.cedula  && c.cedula.includes(query))
   ).slice(0, 7);
 
